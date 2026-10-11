@@ -34,11 +34,12 @@ Two consequences matter:
 
 ## Devnet deployment
 
-| What            | Address                                                                                                                                           |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pacer program   | [`4AX6qNnFYqLqKLvcSe6FkvCJWJsoBF9pK743UmEYLokM`](https://explorer.solana.com/address/4AX6qNnFYqLqKLvcSe6FkvCJWJsoBF9pK743UmEYLokM?cluster=devnet) |
-| Meteora DBC     | [`dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN`](https://explorer.solana.com/address/dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN?cluster=devnet)   |
-| Meteora DAMM v2 | [`cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG`](https://explorer.solana.com/address/cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG?cluster=devnet)   |
+| What              | Address                                                                                                                                                                                                                       |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pacer program     | [`4AX6qNnFYqLqKLvcSe6FkvCJWJsoBF9pK743UmEYLokM`](https://explorer.solana.com/address/4AX6qNnFYqLqKLvcSe6FkvCJWJsoBF9pK743UmEYLokM?cluster=devnet)                                                                             |
+| Upgrade authority | [`AKBMcamQCJJ6CTobQzqMUQMG5AzSdyBKfc4GD6wtA7MG`](https://explorer.solana.com/address/AKBMcamQCJJ6CTobQzqMUQMG5AzSdyBKfc4GD6wtA7MG?cluster=devnet) (single key, devnet only; see [SECURITY.md](SECURITY.md#upgrade-authority)) |
+| Meteora DBC       | [`dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN`](https://explorer.solana.com/address/dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN?cluster=devnet)                                                                               |
+| Meteora DAMM v2   | [`cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG`](https://explorer.solana.com/address/cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG?cluster=devnet)                                                                               |
 
 <!-- devnet-run:start -->
 
@@ -147,7 +148,7 @@ const { transaction: buyTx } = await buildPacedBuyTx(connection, {
 
 - Many wallets can still compete for each released slice; the clock and burst bucket bound the rate across all of them, `max_per_buy` bounds a single transaction. Per-wallet limits are on the roadmap.
 - While on the curve, like every hook token, Pacer tokens are tradable only through hook-aware routes (DBC SDK, this app). After graduation they are plain Token-2022 tokens.
-- The hook program must never be closed while a curve is live.
+- **The program is upgradeable on devnet, by a single key.** Its upgrade authority could change or switch off the rules for tokens still on their curve (it can't move anyone's funds, and has no effect after graduation). Before mainnet it becomes immutable or moves to a timelocked multisig; see [SECURITY.md](SECURITY.md#upgrade-authority).
 - Pacer reads DBC's `TransferHookPool` layout by fixed offsets (DBC v0.2.1).
 
 ## Roadmap

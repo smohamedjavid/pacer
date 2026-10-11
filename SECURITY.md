@@ -10,15 +10,15 @@ Please open a private security advisory on GitHub (Security → Advisories → R
 
 Pacer is a Token-2022 transfer hook attached to a Meteora DBC pool's base mint. Its authority is deliberately narrow:
 
-| Pacer can                                                                             | Pacer cannot                                                       |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Reject a buy that would take more supply out of the curve than the clock has released | Move, mint, freeze or burn anyone's tokens                         |
-| Reject a single buy larger than `max_per_buy`                                         | Block sells or wallet-to-wallet transfers                          |
-| Reject a buy that would overdraw the burst bucket                                     |                                                                    |
-| Record counters (buys, sells, totals)                                                 | Change the schedule after launch (no admin, no update instruction) |
-|                                                                                       | Run after graduation: DBC revokes the hook on curve completion     |
+| Pacer can                                                                             | Pacer cannot                                                   |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Reject a buy that would take more supply out of the curve than the clock has released | Move, mint, freeze or burn anyone's tokens                     |
+| Reject a single buy larger than `max_per_buy`                                         | Block sells or wallet-to-wallet transfers                      |
+| Reject a buy that would overdraw the burst bucket                                     |                                                                |
+| Record counters (buys, sells, totals)                                                 | Change the schedule after launch (no update instruction)       |
+|                                                                                       | Run after graduation: DBC revokes the hook on curve completion |
 
-The pool creator sets the schedule once, inside the launch transaction. There is no upgradeable configuration, no fee, and no privileged role in the program after `initialize_pace`.
+The pool creator sets the schedule once, inside the launch transaction. There is no configuration to update, no fee, and no privileged role in the program's instructions after `initialize_pace`. The one privileged key is the program's **upgrade authority**, described next.
 
 ## Threats and mitigations
 
@@ -35,9 +35,25 @@ The pool creator sets the schedule once, inside the launch transaction. There is
 | Griefing the shared burst bucket by buying and selling straight back                                 | Sells refill the bucket by the amount returned, so it limits net outflow per window                                                      | `buying and selling straight back cannot keep the burst bucket empty`                       |
 | Arithmetic overflow                                                                                  | Saturating math for the release schedule and bucket; every subtraction is guarded by a comparison                                        | `release_saturates_instead_of_overflowing`                                                  |
 
+## Upgrade authority
+
+Pacer is an upgradeable program. Whoever holds its upgrade authority can replace the code that runs for **every** Pacer mint still on its curve, because those mints point at the program ID.
+
+| The upgrade authority could                                                                                                | It could not                                                                                                                                    |
+| -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Change the rules for tokens still on their curve: switch the clock off, or reject all or some transfers (freeze or censor) | Move, mint or burn anyone's tokens or SOL: Token-2022 never passes signer authority to a hook, and Pacer is neither mint authority nor delegate |
+| Close the program, which makes every transfer of every live hooked mint fail                                               | Affect a token after graduation: DBC revokes the hook in the curve-completing swap                                                              |
+
+**Current state (devnet):** the upgrade authority is a single key held by the author, `AKBMcamQCJJ6CTobQzqMUQMG5AzSdyBKfc4GD6wtA7MG`. Verify it with `solana program show 4AX6qNnFYqLqKLvcSe6FkvCJWJsoBF9pK743UmEYLokM -u devnet`.
+
+**Before any mainnet use**, one of these, in order of preference:
+
+1. **Immutable.** Revoke the upgrade authority (`solana program set-upgrade-authority <id> --final`) after a verified build, so the published rules can never change.
+2. **Multisig with a timelock.** Transfer the authority to a Squads multisig whose upgrades wait out a public delay longer than the longest clock, so no live launch can have its rules changed mid-schedule.
+
 ## Known limitations
 
 - **Sybil buyers.** The clock and burst bucket limit how fast supply leaves the curve, not who receives it. Many wallets can still compete for each released slice; `max_per_buy` bounds any single transaction. Per-wallet limits are on the roadmap.
-- **Closing the program freezes live curves.** A transfer hook program that no longer exists makes every transfer of its mints fail. The program must never be closed while any curve is live. The upgrade authority should move to a multisig before any mainnet use.
+- **Closing the program freezes live curves.** A transfer hook program that no longer exists makes every transfer of its mints fail. See [Upgrade authority](#upgrade-authority).
 - **Aggregator routing.** Like every hook token, a Pacer token cannot be routed by aggregators that don't resolve transfer-hook accounts while it is on the curve. Pacer's extra accounts derive only from the mint and pool, so any standard resolver handles them, including the DBC SDK's.
 - **Dependency on DBC's pool layout.** Pacer reads `base_mint`, `base_vault`, `creator` and `base_reserve` from DBC's `TransferHookPool` by fixed byte offsets (verified against DBC v0.2.1). A DBC layout change would require a Pacer upgrade.
