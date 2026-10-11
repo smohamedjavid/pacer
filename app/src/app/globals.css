@@ -2,7 +2,9 @@
 
 /*
  * Pacer — a chronograph dial at night.
- * Midnight-blue dial, ivory printing, one gilt hand for the issuance clock.
+ * Midnight-blue dial, ivory printing, one champagne-gilt hand for the issuance clock.
+ * One type family (Instrument Sans) with tabular figures for every readout; the wide
+ * Michroma face is reserved for the wordmark, like the name printed on a dial.
  */
 @theme {
   --color-dial: #0b1b2e;
@@ -13,15 +15,16 @@
   --color-ivory: #ede7d9;
   --color-fog: #a7b4c2;
   --color-steel: #6c819a;
-  --color-gilt: #f3b23c;
-  --color-gilt-soft: #f3b23c29;
+  --color-gilt: #dcb162;
+  --color-gilt-soft: #dcb16229;
   --color-gilt-ink: #1a1205;
   --color-verdigris: #4fc7a8;
   --color-signal: #ff6f61;
 
-  --font-display: var(--font-michroma), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --font-wordmark: var(--font-michroma), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-martian), ui-monospace, monospace;
+  --font-mono: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
 
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
@@ -72,11 +75,18 @@
 }
 
 @layer utilities {
-  /* Live counters: monospaced, tabular, never jitter. */
-  .readout {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums slashed-zero;
-    letter-spacing: -0.02em;
+  /* Live counters: tabular lining figures, so digits never jitter as they tick. */
+  .readout,
+  .font-mono {
+    font-variant-numeric: tabular-nums lining-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Headlines: semi-condensed, medium weight, tight tracking, like dial printing. */
+  .font-display {
+    font-weight: 500;
+    font-stretch: 88%;
+    letter-spacing: -0.03em;
   }
 }
 

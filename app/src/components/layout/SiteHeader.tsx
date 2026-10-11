@@ -9,7 +9,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5 rounded-md text-ivory" aria-label="Pacer home">
           <PacerMark className="size-7 text-ivory" />
-          <span className="font-display text-sm tracking-[0.18em]">PACER</span>
+          <span className="font-wordmark text-sm tracking-[0.18em]">PACER</span>
         </Link>
         <span
           className="hidden rounded-full border border-rule px-2.5 py-0.5 text-2xs text-fog sm:inline-block"
