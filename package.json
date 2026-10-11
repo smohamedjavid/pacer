@@ -1,0 +1,14 @@
+{
+  "name": "pacer-monorepo",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build:program": "anchor build",
+    "demo": "pnpm --filter @pacer/scripts demo",
+    "dev": "pnpm --filter @pacer/app dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "prettier": "^3.3.3"
+  }
+}
