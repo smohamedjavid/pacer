@@ -20,6 +20,8 @@ Two consequences matter:
 - **No one-block sweeps, no idle-allowance sweeps.** The clock bounds cumulative supply; the burst bucket bounds any short window across all wallets and transactions, so allowance that piles up while nobody buys can't be taken at once.
 - **A provable price speed limit.** Because supply out of the curve is capped at every moment, so is the curve price. The SDK computes the exact ceiling (`priceCeilingAt`; a test asserts it matches DBC's live price to within 1e-12) and the app charts it. Buyers can see the highest price the token can possibly reach by any given time.
 
+> **Live app (devnet):** https://pacer-sepia.vercel.app
+>
 > **Status:** hackathon build for the Superteam Earn bounty "Best use of Meteora's Dynamic Bonding Curve". Unaudited, devnet only.
 
 ## For judges
