@@ -13,3 +13,4 @@ demo-runs/*localnet*
 demo-runs/failed-*
 .next/
 *.tsbuildinfo
+demo-runs/wallets-*

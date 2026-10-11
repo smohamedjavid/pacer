@@ -52,14 +52,15 @@ import {
   sendExpectFailure,
   sleep,
   sweepBack,
+  saveWallets,
   writeRunReport,
 } from './env.js'
 
-const CLOCK_SECONDS = Number(process.env.CLOCK_SECONDS ?? (CLUSTER === 'devnet' ? 240 : 90))
-const MIGRATION_SOL = Number(process.env.MIGRATION_SOL ?? (CLUSTER === 'devnet' ? 1.5 : 5))
+const CLOCK_SECONDS = Number(process.env.CLOCK_SECONDS ?? (CLUSTER === 'devnet' ? 300 : 240))
+const MIGRATION_SOL = Number(process.env.MIGRATION_SOL ?? (CLUSTER === 'devnet' ? 1 : 5))
 const OPENING_BPS = Number(process.env.OPENING_BPS ?? 200) // 2% at open
-const MAX_PER_BUY_BPS = Number(process.env.MAX_PER_BUY_BPS ?? 600) // 6% per buy
-const BURST_BPS = Number(process.env.BURST_BPS ?? 1_200) // at most 12% in a burst
+const MAX_PER_BUY_BPS = Number(process.env.MAX_PER_BUY_BPS ?? 800) // 8% per buy
+const BURST_BPS = Number(process.env.BURST_BPS ?? 1_600) // at most 16% in a burst
 const BUYERS = Number(process.env.BUYERS ?? 3)
 // Smallest slice worth a transaction (bps of curve supply); larger on devnet to spare the public RPC.
 const MIN_SLICE_BPS = Number(process.env.MIN_SLICE_BPS ?? (CLUSTER === 'devnet' ? 300 : 25))
@@ -74,6 +75,15 @@ interface Step {
 }
 
 const steps: Step[] = []
+const wallets: Keypair[] = []
+const RUN_ID = new Date().toISOString().replace(/[:.]/g, '-')
+
+/** Remember a throwaway wallet (and persist its key) so its SOL can always be swept back. */
+function track(kp: Keypair): Keypair {
+  wallets.push(kp)
+  saveWallets(`wallets-${CLUSTER}-${RUN_ID}`, wallets)
+  return kp
+}
 const timeline: Array<{ t: number; released: string; netOut: string }> = []
 
 function log(msg: string) {
@@ -95,13 +105,14 @@ async function main() {
   const dbc = DynamicBondingCurveClient.create(connection, 'confirmed')
 
   // ── Wallets ────────────────────────────────────────────────────────────────
-  const creator = Keypair.generate()
-  const sniper = Keypair.generate()
-  const buyers = Array.from({ length: BUYERS }, () => Keypair.generate())
-  const perBuyerSol = CLUSTER === 'devnet' ? MIGRATION_SOL / BUYERS + 0.15 : MIGRATION_SOL
-  await fund(creator.publicKey, CLUSTER === 'devnet' ? 0.1 : 5)
-  await fund(sniper.publicKey, CLUSTER === 'devnet' ? MIGRATION_SOL * 0.6 : MIGRATION_SOL * 2)
-  for (const b of buyers) await fund(b.publicKey, perBuyerSol)
+  const creator = track(Keypair.generate())
+  const sniper = track(Keypair.generate())
+  const buyers = Array.from({ length: BUYERS }, () => track(Keypair.generate()))
+  const devnet = CLUSTER === 'devnet'
+  await fund(creator.publicKey, devnet ? 0.08 : 5)
+  // The sniper's sweep must be large enough to matter; on devnet it is sent anyway and fails.
+  await fund(sniper.publicKey, devnet ? MIGRATION_SOL * 0.6 : MIGRATION_SOL * 2)
+  for (const b of buyers) await fund(b.publicKey, devnet ? MIGRATION_SOL / BUYERS + 0.12 : MIGRATION_SOL)
   log(`Funded creator, sniper and ${BUYERS} buyers`)
 
   // ── 1. Partner config ─────────────────────────────────────────────────────
@@ -157,23 +168,11 @@ async function main() {
       `full release at +${clockEndsAt(pace, curveTotal) - pace.startTs}s`
   )
 
-  // ── 3. Sniper tries to sweep the curve ────────────────────────────────────
-  const sweepLamports = new BN(Math.floor(MIGRATION_SOL * 0.5 * LAMPORTS_PER_SOL))
-  const sweepTx = await buildQuoteInBuyTx(connection, { owner: sniper.publicKey, pool, quoteAmountIn: sweepLamports })
-  const sweepRes = await sendExpectFailure(sweepTx, [sniper])
-  record({
-    step: `Sniper sweeps ${MIGRATION_SOL * 0.5} SOL in block one`,
-    ok: !sweepRes.ok, // success = the hook rejected it
-    signature: sweepRes.signature,
-    detail: { reverted: !sweepRes.ok, reason: pacerErrorFromLogs(sweepRes.logs) ?? sweepRes.error },
-  })
-  if (sweepRes.ok) throw new Error('expected the sweep to revert')
-  log(`  ↳ reverted by Pacer: ${pacerErrorFromLogs(sweepRes.logs)}`)
-
-  // Same sniper, staying under the per-buy cap but ahead of the clock (with a few seconds of
-  // margin so the clock can't catch up while the transaction is in flight).
+  // ── 3. Sniper tries to buy ahead of the clock, right at open ───────────────
+  // Under the per-buy cap but beyond what's released (with margin so the clock can't catch
+  // up while the transaction is in flight on a slow RPC).
   const aheadAmount = pace.maxPerBuy > 0n ? (pace.maxPerBuy * 95n) / 100n : pace.openingTranche * 3n
-  const releasedSoon = releasedAt(pace, (await chainTime()) + 4)
+  const releasedSoon = releasedAt(pace, (await chainTime()) + 10)
   if (aheadAmount <= releasedSoon) throw new Error('clock too fast for the ahead-of-clock step; raise CLOCK_SECONDS')
   const { transaction: aheadTx } = await buildPacedBuyTx(connection, {
     owner: sniper.publicKey,
@@ -190,10 +189,23 @@ async function main() {
   if (aheadRes.ok) throw new Error('expected the ahead-of-clock buy to revert')
   log(`  ↳ reverted by Pacer: ${pacerErrorFromLogs(aheadRes.logs)}`)
 
+  // A full sweep is stopped even earlier, by the per-buy cap.
+  const sweepLamports = new BN(Math.floor(MIGRATION_SOL * 0.5 * LAMPORTS_PER_SOL))
+  const sweepTx = await buildQuoteInBuyTx(connection, { owner: sniper.publicKey, pool, quoteAmountIn: sweepLamports })
+  const sweepRes = await sendExpectFailure(sweepTx, [sniper])
+  record({
+    step: `Sniper sweeps ${MIGRATION_SOL * 0.5} SOL in block one`,
+    ok: !sweepRes.ok, // success = the hook rejected it
+    signature: sweepRes.signature,
+    detail: { reverted: !sweepRes.ok, reason: pacerErrorFromLogs(sweepRes.logs) ?? sweepRes.error },
+  })
+  if (sweepRes.ok) throw new Error('expected the sweep to revert')
+  log(`  ↳ reverted by Pacer: ${pacerErrorFromLogs(sweepRes.logs)}`)
+
   // ── 3b. Quiet period, then three bots fire in the same second ───────────────
   // Without a burst limit, allowance that piles up while nobody buys could be swept at once.
-  const bots = [Keypair.generate(), Keypair.generate(), Keypair.generate()]
-  for (const bot of bots) await fund(bot.publicKey, CLUSTER === 'devnet' ? 0.2 : 2)
+  const bots = [track(Keypair.generate()), track(Keypair.generate()), track(Keypair.generate())]
+  for (const bot of bots) await fund(bot.publicKey, CLUSTER === 'devnet' ? 0.15 : 2)
   const burstSlice = pace.maxPerBuy
   for (;;) {
     const p = (await fetchPaceState(connection, mint))!
@@ -397,16 +409,20 @@ async function main() {
     steps,
     timeline,
   }
-  if (CLUSTER === 'devnet') {
-    const swept = await sweepBack([creator, sniper, ...buyers, ...bots])
-    log(`Returned ${swept.toFixed(3)} SOL from demo wallets to the deployer`)
-  }
   const file = writeRunReport(`latest-${CLUSTER}`, report)
   log(`Report written to ${file}`)
 }
 
-main().catch((err) => {
-  console.error(err)
-  writeRunReport(`failed-${CLUSTER}`, { steps, timeline, error: String(err) })
-  process.exit(1)
-})
+main()
+  .catch((err) => {
+    console.error(err)
+    writeRunReport(`failed-${CLUSTER}`, { steps, timeline, error: String(err) })
+    process.exitCode = 1
+  })
+  .finally(async () => {
+    // Never strand devnet SOL in throwaway wallets, even when a run fails.
+    if (CLUSTER === 'devnet' && wallets.length > 0) {
+      const swept = await sweepBack(wallets)
+      log(`Returned ${swept.toFixed(3)} SOL from ${wallets.length} demo wallets to the deployer`)
+    }
+  })

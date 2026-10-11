@@ -127,3 +127,12 @@ export function writeRunReport(name: string, data: unknown): string {
   )
   return file
 }
+
+/** Persist throwaway wallet keys (gitignored) so funds are recoverable if a run is interrupted. */
+export function saveWallets(name: string, wallets: Keypair[]): void {
+  const dir = resolve(ROOT, 'demo-runs')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(resolve(dir, `${name}.json`), JSON.stringify(wallets.map((w) => Array.from(w.secretKey))), {
+    mode: 0o600,
+  })
+}
