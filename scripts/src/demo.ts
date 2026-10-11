@@ -17,6 +17,7 @@ import {
   DynamicBondingCurveClient,
   availableToBuy,
   buildCreatePacedConfigTx,
+  buildFillCurveBuyTx,
   buildPacedBuyTx,
   buildPacedCurveConfig,
   buildPacedLaunchTx,
@@ -28,7 +29,7 @@ import {
   pacerErrorFromLogs,
   releasedAt,
 } from '@pacer/sdk'
-import { deriveDammV2PoolAddress, SwapMode } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import { deriveDammV2PoolAddress } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import {
   TOKEN_2022_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
@@ -250,14 +251,10 @@ async function main() {
       const richest = balances.indexOf(Math.max(...balances))
       const buyer = participants[richest]!
       const spendable = balances[richest]! - 0.05 * LAMPORTS_PER_SOL
-      const tx = await dbc.pool.swap2WithTransferHook({
+      const tx = await buildFillCurveBuyTx(connection, {
         owner: buyer.publicKey,
         pool,
-        swapBaseForQuote: false,
-        referralTokenAccount: null,
-        swapMode: SwapMode.PartialFill,
-        amountIn: new BN(Math.floor(spendable)),
-        minimumAmountOut: new BN(0),
+        maxQuoteIn: new BN(Math.floor(spendable)),
       })
       const res = await send(tx, [buyer])
       record({ step: 'Final paced buy completes the curve', ok: res.ok, signature: res.signature })

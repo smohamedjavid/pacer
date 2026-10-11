@@ -48,6 +48,8 @@ export interface PacedCurveOptions {
   curveFeeBps: number
   /** Creator share of curve trading fees (percent). */
   creatorTradingFeePercentage: number
+  /** Which token curve fees are collected in (default: quote). */
+  collectFeeMode?: CollectFeeMode
 }
 
 export const DEFAULT_PACED_CURVE: PacedCurveOptions = {
@@ -86,7 +88,7 @@ export function buildPacedCurveConfig(opts: PacedCurveOptions = DEFAULT_PACED_CU
         },
       },
       dynamicFeeEnabled: true,
-      collectFeeMode: CollectFeeMode.QuoteToken,
+      collectFeeMode: opts.collectFeeMode ?? CollectFeeMode.QuoteToken,
       creatorTradingFeePercentage: opts.creatorTradingFeePercentage,
       poolCreationFee: 0,
       enableFirstSwapWithMinFee: false,
@@ -239,11 +241,52 @@ export async function buildPacedBuyTx(
   return { transaction, maxQuoteIn }
 }
 
-/** Spend an exact amount of quote (e.g. a sniper sweeping the curve). */
+/**
+ * Quote an exact-in or partial-fill swap and return the slippage-protected minimum output.
+ * Every SDK swap builder sets a real minimum so trades can't be sandwiched to zero.
+ */
+export async function quoteMinimumOut(
+  connection: Connection,
+  args: {
+    pool: PublicKey
+    swapBaseForQuote: boolean
+    swapMode: SwapMode.ExactIn | SwapMode.PartialFill
+    amountIn: BN
+    slippageBps?: number
+  }
+): Promise<BN> {
+  const client = dbcClient(connection)
+  const virtualPool = await client.state.getPool(args.pool)
+  if (!virtualPool) throw new Error(`DBC pool not found: ${args.pool.toBase58()}`)
+  const config = await client.state.getPoolConfig(virtualPool.poolState.config)
+  if (!config) throw new Error('DBC config not found')
+  const currentPoint = await getCurrentPoint(connection, config.activationType)
+  const quote = client.pool.swapQuote2({
+    virtualPool,
+    config,
+    swapBaseForQuote: args.swapBaseForQuote,
+    hasReferral: false,
+    eligibleForFirstSwapWithMinFee: false,
+    currentPoint,
+    slippageBps: args.slippageBps ?? 100,
+    swapMode: args.swapMode,
+    amountIn: args.amountIn,
+  })
+  return new BN(quote.minimumAmountOut!.toString())
+}
+
+/** Spend an exact amount of quote on base tokens. */
 export async function buildQuoteInBuyTx(
   connection: Connection,
-  args: { owner: PublicKey; pool: PublicKey; quoteAmountIn: BN; payer?: PublicKey }
+  args: { owner: PublicKey; pool: PublicKey; quoteAmountIn: BN; slippageBps?: number; payer?: PublicKey }
 ): Promise<Transaction> {
+  const minimumAmountOut = await quoteMinimumOut(connection, {
+    pool: args.pool,
+    swapBaseForQuote: false,
+    swapMode: SwapMode.ExactIn,
+    amountIn: args.quoteAmountIn,
+    slippageBps: args.slippageBps,
+  })
   return dbcClient(connection).pool.swap2WithTransferHook({
     owner: args.owner,
     payer: args.payer,
@@ -252,15 +295,22 @@ export async function buildQuoteInBuyTx(
     referralTokenAccount: null,
     swapMode: SwapMode.ExactIn,
     amountIn: args.quoteAmountIn,
-    minimumAmountOut: new BN(0),
+    minimumAmountOut,
   })
 }
 
 /** Sell base tokens back to the curve; this frees issuance allowance. */
 export async function buildSellTx(
   connection: Connection,
-  args: { owner: PublicKey; pool: PublicKey; baseAmountIn: BN; payer?: PublicKey }
+  args: { owner: PublicKey; pool: PublicKey; baseAmountIn: BN; slippageBps?: number; payer?: PublicKey }
 ): Promise<Transaction> {
+  const minimumAmountOut = await quoteMinimumOut(connection, {
+    pool: args.pool,
+    swapBaseForQuote: true,
+    swapMode: SwapMode.ExactIn,
+    amountIn: args.baseAmountIn,
+    slippageBps: args.slippageBps,
+  })
   return dbcClient(connection).pool.swap2WithTransferHook({
     owner: args.owner,
     payer: args.payer,
@@ -269,7 +319,7 @@ export async function buildSellTx(
     referralTokenAccount: null,
     swapMode: SwapMode.ExactIn,
     amountIn: args.baseAmountIn,
-    minimumAmountOut: new BN(0),
+    minimumAmountOut,
   })
 }
 

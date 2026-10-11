@@ -157,7 +157,7 @@ pub mod pacer {
 
     /// Token-2022 transfer hook entrypoint.
     #[instruction(discriminator = ExecuteInstruction::SPL_DISCRIMINATOR_SLICE)]
-    pub fn execute(ctx: Context<Execute>, amount: u64) -> Result<()> {
+    pub fn execute(ctx: Context<Execute>, _amount: u64) -> Result<()> {
         // Only a real Token-2022 transfer of *this* mint may drive the hook: Token-2022 sets
         // `transferring` on the source account for the duration of the transfer, and the
         // source must hold this mint. A hook of another token cannot replay us mid-transfer.
@@ -182,17 +182,21 @@ pub mod pacer {
         };
         let net_out = pace.initial_base_reserve.saturating_sub(base_reserve);
 
-        if source == pace.base_vault {
-            // Buy: supply leaves the curve. Enforce the clock.
+        // Classify by what DBC did to its reserves, not by transfer direction: vault
+        // transfers that don't move the reserves (base-token fee claims, leftover
+        // withdrawals, donations) are not trades and must never be blocked or metered.
+        if net_out > pace.net_out {
+            // Buy: supply left the curve. Meter exactly what left it.
+            let taken = net_out - pace.net_out;
             if pace.max_per_buy > 0 {
-                require!(amount <= pace.max_per_buy, PacerError::ExceedsMaxPerBuy);
+                require!(taken <= pace.max_per_buy, PacerError::ExceedsMaxPerBuy);
             }
             let now = Clock::get()?.unix_timestamp;
             let released = pace.released_at(now);
             if net_out > released {
                 msg!(
                     "pacer: buy {} > available {} (released {}, out {})",
-                    amount,
+                    taken,
                     released.saturating_sub(pace.net_out),
                     released,
                     pace.net_out
@@ -201,26 +205,25 @@ pub mod pacer {
             }
             if pace.burst_capacity > 0 {
                 let level = pace.burst_level_at(now);
-                if amount > level {
-                    msg!("pacer: buy {} > burst available {}", amount, level);
+                if taken > level {
+                    msg!("pacer: buy {} > burst available {}", taken, level);
                     return err!(PacerError::BurstLimit);
                 }
-                pace.burst_level = level - amount;
+                pace.burst_level = level - taken;
                 pace.burst_updated_ts = now;
             }
             pace.net_out = net_out;
-            pace.total_bought = pace.total_bought.saturating_add(amount);
+            pace.total_bought = pace.total_bought.saturating_add(taken);
             pace.buys = pace.buys.saturating_add(1);
             emit!(PacedBuy {
                 mint: pace.mint,
-                amount,
+                amount: taken,
                 net_out,
                 released,
                 ts: now,
             });
         } else if net_out < pace.net_out {
-            // Sell through DBC: supply returned to the curve frees allowance. A plain transfer
-            // into the vault leaves DBC's reserves unchanged and is ignored.
+            // Sell through DBC: supply returned to the curve frees allowance.
             let returned = pace.net_out - net_out;
             pace.net_out = net_out;
             pace.total_sold = pace.total_sold.saturating_add(returned);

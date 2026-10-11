@@ -1,7 +1,7 @@
 import { SwapMode } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type { Connection, PublicKey, Transaction } from '@solana/web3.js'
 import BN from 'bn.js'
-import { dbcClient } from './dbc.js'
+import { dbcClient, quoteMinimumOut } from './dbc.js'
 
 /**
  * Buy whatever is left on the curve, spending at most `maxQuoteIn`.
@@ -12,8 +12,15 @@ import { dbcClient } from './dbc.js'
  */
 export async function buildFillCurveBuyTx(
   connection: Connection,
-  args: { owner: PublicKey; pool: PublicKey; maxQuoteIn: BN; payer?: PublicKey }
+  args: { owner: PublicKey; pool: PublicKey; maxQuoteIn: BN; slippageBps?: number; payer?: PublicKey }
 ): Promise<Transaction> {
+  const minimumAmountOut = await quoteMinimumOut(connection, {
+    pool: args.pool,
+    swapBaseForQuote: false,
+    swapMode: SwapMode.PartialFill,
+    amountIn: args.maxQuoteIn,
+    slippageBps: args.slippageBps,
+  })
   return dbcClient(connection).pool.swap2WithTransferHook({
     owner: args.owner,
     payer: args.payer,
@@ -22,6 +29,6 @@ export async function buildFillCurveBuyTx(
     referralTokenAccount: null,
     swapMode: SwapMode.PartialFill,
     amountIn: args.maxQuoteIn,
-    minimumAmountOut: new BN(0),
+    minimumAmountOut,
   })
 }

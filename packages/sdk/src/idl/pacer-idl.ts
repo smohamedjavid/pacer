@@ -106,7 +106,7 @@ export const PACER_IDL_JSON = {
       ],
       "args": [
         {
-          "name": "amount",
+          "name": "_amount",
           "type": "u64"
         }
       ]

@@ -14,6 +14,7 @@ import {
   buildPacedBuyTx,
   buildPacedCurveConfig,
   buildPacedLaunchTx,
+  DEFAULT_PACED_CURVE,
   buildSellTx,
   dbcClient,
   deriveExtraAccountMetaList,
@@ -25,6 +26,7 @@ import {
   type PaceSchedule,
 } from '@pacer/sdk'
 import {
+  CollectFeeMode,
   deriveDbcPoolAddress,
   deriveDbcTokenVaultAddress,
   getPriceFromSqrtPrice,
@@ -273,6 +275,53 @@ describe('pacer', { skip: CLUSTER !== 'localnet' && 'integration tests run on lo
     const model = priceAtNetOut(cfg, new BN(after.netOut.toString()))
     const live = getPriceFromSqrtPrice(state.poolState.sqrtPrice, 6, 9).toNumber()
     assert.ok(Math.abs(model - live) / live < 1e-9, `model ${model} vs live ${live}`)
+  })
+
+  test('base-token fee claims from the curve vault are not metered as buys', async () => {
+    // Fees collected in the output token leave base fees in the vault; claiming them moves base
+    // out of the vault without touching DBC's reserves. That must never hit the clock or bucket.
+    const cfgKp = Keypair.generate()
+    const cfgTx = await buildCreatePacedConfigTx(connection, {
+      payer: deployer.publicKey,
+      config: cfgKp.publicKey,
+      feeClaimer: deployer.publicKey,
+      curve: buildPacedCurveConfig({ ...DEFAULT_PACED_CURVE, collectFeeMode: CollectFeeMode.OutputToken }),
+    })
+    assert.ok((await send(cfgTx, [deployer, cfgKp])).ok)
+    const creator = await buyer(2)
+    const mintKp = Keypair.generate()
+    const launchRes = await buildPacedLaunchTx(connection, {
+      payer: creator.publicKey,
+      creator: creator.publicKey,
+      config: cfgKp.publicKey,
+      baseMint: mintKp.publicKey,
+      name: 'Pacer Fees',
+      symbol: 'PFEE',
+      uri: 'https://example.com/token.json',
+      schedule: { openingBps: 5_000, clockSeconds: 1_000_000, maxPerBuyBps: 0, burstBps: 200 },
+    })
+    assert.ok((await send(launchRes.transaction, [creator, mintKp])).ok)
+    const mint = mintKp.publicKey
+    const pool = launchRes.pool
+    const b = await buyer(6)
+    const pace = (await fetchPaceState(connection, mint))!
+    // Drain the burst bucket completely, so any metered outflow would revert.
+    assert.ok((await buy(b, pool, pace.burstCapacity - pace.burstCapacity / 50n)).ok)
+    const before = (await fetchPaceState(connection, mint))!
+
+    const claimTx = await dbcClient(connection).partner.claimPartnerTradingFee2({
+      feeClaimer: deployer.publicKey,
+      payer: deployer.publicKey,
+      pool,
+      maxBaseAmount: new BN('18446744073709551615'),
+      maxQuoteAmount: new BN('18446744073709551615'),
+      receiver: deployer.publicKey,
+    })
+    const res = await send(claimTx, [deployer])
+    assert.ok(res.ok, `fee claim should pass the hook: ${res.error}\n${res.logs?.slice(-6).join('\n')}`)
+    const after = (await fetchPaceState(connection, mint))!
+    assert.equal(after.netOut, before.netOut)
+    assert.equal(after.buys, before.buys)
   })
 
   test('a running clock cannot be re-initialized', async () => {
