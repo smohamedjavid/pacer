@@ -1,0 +1,44 @@
+{
+  "name": "@pacer/app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "0.32.1",
+    "@meteora-ag/dynamic-bonding-curve-sdk": "1.5.13",
+    "@pacer/sdk": "workspace:*",
+    "@solana/spl-token": "^0.4.13",
+    "@solana/spl-token-metadata": "^0.1.6",
+    "@solana/wallet-adapter-base": "^0.9.28",
+    "@solana/wallet-adapter-react": "^0.15.40",
+    "@solana/wallet-adapter-react-ui": "^0.9.40",
+    "@solana/web3.js": "^1.98.4",
+    "@tanstack/react-query": "^5.104.1",
+    "bn.js": "^5.2.1",
+    "bs58": "^6.0.0",
+    "buffer": "^6.0.3",
+    "next": "15.5.27",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/bn.js": "^5.1.6",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "15.5.27",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.7.3"
+  }
+}

@@ -62,6 +62,8 @@ const OPENING_BPS = Number(process.env.OPENING_BPS ?? 200) // 2% at open
 const MAX_PER_BUY_BPS = Number(process.env.MAX_PER_BUY_BPS ?? 800) // 8% per buy
 const BURST_BPS = Number(process.env.BURST_BPS ?? 1_600) // at most 16% in a burst
 const BUYERS = Number(process.env.BUYERS ?? 3)
+// SOL the sniper throws at the curve in one transaction.
+const SWEEP_SOL = Number(process.env.SWEEP_SOL ?? (CLUSTER === 'devnet' ? 0.3 : 2.5))
 // Smallest slice worth a transaction (bps of curve supply); larger on devnet to spare the public RPC.
 const MIN_SLICE_BPS = Number(process.env.MIN_SLICE_BPS ?? (CLUSTER === 'devnet' ? 300 : 25))
 const TOKEN_DECIMALS = 6
@@ -111,8 +113,8 @@ async function main() {
   const devnet = CLUSTER === 'devnet'
   await fund(creator.publicKey, devnet ? 0.08 : 5)
   // The sniper's sweep must be large enough to matter; on devnet it is sent anyway and fails.
-  await fund(sniper.publicKey, devnet ? MIGRATION_SOL * 0.6 : MIGRATION_SOL * 2)
-  for (const b of buyers) await fund(b.publicKey, devnet ? MIGRATION_SOL / BUYERS + 0.12 : MIGRATION_SOL)
+  await fund(sniper.publicKey, devnet ? SWEEP_SOL + 0.05 : MIGRATION_SOL * 2)
+  for (const b of buyers) await fund(b.publicKey, devnet ? MIGRATION_SOL / BUYERS + 0.1 : MIGRATION_SOL)
   log(`Funded creator, sniper and ${BUYERS} buyers`)
 
   // ── 1. Partner config ─────────────────────────────────────────────────────
@@ -190,11 +192,11 @@ async function main() {
   log(`  ↳ reverted by Pacer: ${pacerErrorFromLogs(aheadRes.logs)}`)
 
   // A full sweep is stopped even earlier, by the per-buy cap.
-  const sweepLamports = new BN(Math.floor(MIGRATION_SOL * 0.5 * LAMPORTS_PER_SOL))
+  const sweepLamports = new BN(Math.floor(SWEEP_SOL * LAMPORTS_PER_SOL))
   const sweepTx = await buildQuoteInBuyTx(connection, { owner: sniper.publicKey, pool, quoteAmountIn: sweepLamports })
   const sweepRes = await sendExpectFailure(sweepTx, [sniper])
   record({
-    step: `Sniper sweeps ${MIGRATION_SOL * 0.5} SOL in block one`,
+    step: `Sniper sweeps ${SWEEP_SOL} SOL in block one`,
     ok: !sweepRes.ok, // success = the hook rejected it
     signature: sweepRes.signature,
     detail: { reverted: !sweepRes.ok, reason: pacerErrorFromLogs(sweepRes.logs) ?? sweepRes.error },
@@ -205,24 +207,26 @@ async function main() {
   // ── 3b. Quiet period, then three bots fire in the same second ───────────────
   // Without a burst limit, allowance that piles up while nobody buys could be swept at once.
   const bots = [track(Keypair.generate()), track(Keypair.generate()), track(Keypair.generate())]
-  for (const bot of bots) await fund(bot.publicKey, CLUSTER === 'devnet' ? 0.15 : 2)
+  for (const bot of bots) await fund(bot.publicKey, CLUSTER === 'devnet' ? 0.12 : 2)
   const burstSlice = pace.maxPerBuy
   for (;;) {
     const p = (await fetchPaceState(connection, mint))!
     if (releasedAt(p, await chainTime()) - p.netOut >= burstSlice * 3n) break
     await sleep(2_000)
   }
-  const botTxs = await Promise.all(
-    bots.map((bot) =>
-      // Generous slippage: quotes are taken before any bot fills, so only Pacer should stop them.
-      buildPacedBuyTx(connection, {
+  // Build sequentially (public RPCs rate-limit bursts of reads), then fire together.
+  const botTxs = []
+  for (const bot of bots) {
+    // Generous slippage: quotes are taken before any bot fills, so only Pacer should stop them.
+    botTxs.push(
+      await buildPacedBuyTx(connection, {
         owner: bot.publicKey,
         pool,
         baseAmountOut: new BN(burstSlice.toString()),
         slippageBps: 5_000,
       })
     )
-  )
+  }
   const botResults = await Promise.all(botTxs.map(({ transaction }, i) => sendExpectFailure(transaction, [bots[i]!])))
   const blocked = botResults.filter((r) => !r.ok)
   for (const [i, r] of botResults.entries()) {
@@ -275,7 +279,7 @@ async function main() {
     }
 
     if (available < minSlice) {
-      await sleep(1_500)
+      await sleep(CLUSTER === 'devnet' ? 3_000 : 1_500)
       continue
     }
 

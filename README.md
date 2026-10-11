@@ -40,7 +40,35 @@ Two consequences matter:
 | Meteora DBC     | [`dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN`](https://explorer.solana.com/address/dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN?cluster=devnet)   |
 | Meteora DAMM v2 | [`cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG`](https://explorer.solana.com/address/cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG?cluster=devnet)   |
 
-<!-- DEVNET_RUN -->
+### Devnet lifecycle run
+
+`PACER_CLUSTER=devnet pnpm demo` on 2026-10-11: a 300-second clock, 2% at open, max 8% per buy, burst 16%, graduation at 1 SOL. Rejected transactions were sent without preflight, so they are on-chain with Pacer's error in the logs.
+
+| What                    | Address                                                                                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DBC config (Pacer hook) | [`Cjiwf76aZTsnh8tNrDH3xLK6oW4H3LwUjP5BiEAbbezV`](https://explorer.solana.com/address/Cjiwf76aZTsnh8tNrDH3xLK6oW4H3LwUjP5BiEAbbezV?cluster=devnet) |
+| DBC pool                | [`4dYiGnoZX8cvj3pi251BfdiRUKeea3EQM3FGkqxJYRnX`](https://explorer.solana.com/address/4dYiGnoZX8cvj3pi251BfdiRUKeea3EQM3FGkqxJYRnX?cluster=devnet) |
+| Token mint (Token-2022) | [`2yUTsu3EavhvmhySio4o4d1epSMVnn7UPS28oMeC5Kte`](https://explorer.solana.com/address/2yUTsu3EavhvmhySio4o4d1epSMVnn7UPS28oMeC5Kte?cluster=devnet) |
+| PaceState               | [`BW4mKuYSmFnefYWTYCgEUucytWaFuNvPEig3KhYqGo1G`](https://explorer.solana.com/address/BW4mKuYSmFnefYWTYCgEUucytWaFuNvPEig3KhYqGo1G?cluster=devnet) |
+| Graduated DAMM v2 pool  | [`7ZrjfNVvLCexDY72HdWvQvLT9Nz3QJZ9hKuLbvBVZzPx`](https://explorer.solana.com/address/7ZrjfNVvLCexDY72HdWvQvLT9Nz3QJZ9hKuLbvBVZzPx?cluster=devnet) |
+
+| Step                                                                 | Result                                                                                                    | Explorer                                                                                                                                     |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Partner creates Pacer-hooked DBC config                              | ✅                                                                                                        | [tx](https://explorer.solana.com/tx/zU76NnqwpXrKn3T23iCv4djh9gW4BefhxuaGRDLsfLyNE4P8X1QFqnYFhGZKp5xX3f81wnSasJ7SiNnkdBaQYnL?cluster=devnet)  |
+| Creator launches pool + starts issuance clock (one tx)               | ✅                                                                                                        | [tx](https://explorer.solana.com/tx/2tmejmstg3aLcdgn6yP4PQYiCt45CtRsf58Lm3CMbzodYvYxucbBFqYTqNe7xZgWdveGVL1yJJ29QuHyQCazKbm9?cluster=devnet) |
+| Sniper buys 60,799,992 PACE (under the cap, ahead of the clock)      | ❌ reverted by Pacer (expected): Buy is ahead of the issuance clock — wait for more supply to be released | [tx](https://explorer.solana.com/tx/3cnLKCRA6Cxv4ShbXDbCxgC8sAvHLqYm49D6dcxXkxwZAiH7dM964ytgeioYetSL3GqpRthyiQiw8gVeEmtGqTxR?cluster=devnet) |
+| Sniper sweeps 0.3 SOL in block one                                   | ❌ reverted by Pacer (expected): Buy exceeds the maximum size per buy                                     | [tx](https://explorer.solana.com/tx/5yEjnW4heECdMRJvfm5NHWV8jLp4P7FqeHPJSM7Q1JEaTvzyXTKjcTP25h5JWLRReDSNEWJv8nH8op66RKSPdtb8?cluster=devnet) |
+| Bot 1 buys 63,999,992 PACE in the same burst                         | ✅ filled                                                                                                 | [tx](https://explorer.solana.com/tx/55jn9Q5MLxtud61k6s4bSJfueT16quJBy5XfyRD1EZXpbMsdxepXhKu6sLSHP9rxLsAZXiTRqF9DGqeehXxHGZUw?cluster=devnet) |
+| Bot 2 buys 63,999,992 PACE in the same burst                         | ✅ filled                                                                                                 | [tx](https://explorer.solana.com/tx/4yptQsbLSqL4p9yChegsjuEuchmCBMCiuBptQ2E2ywyE3iE5KkwbYazVjtSUPDLpEaMDsJ5SM85d4zgVM4LR1SiZ?cluster=devnet) |
+| Bot 3 buys 63,999,992 PACE in the same burst                         | ❌ blocked (expected): Buy exceeds the burst limit — too much supply bought in a short window             | [tx](https://explorer.solana.com/tx/3EKy7mQspm7tSmNL4Ggt8Yjet4hRpHTieN8FFU6W9hWBKtmKvJfB1rvNAMKa2bzmyKoJoAmu3N9mqgcdCeZQGLHq?cluster=devnet) |
+| Paced buy 28,746,663 PACE (t+101s) (first of 22 paced buys)          | ✅                                                                                                        | [tx](https://explorer.solana.com/tx/3gpsGEkcEZM4E6MC5pyWkjGRtH49RQ1hNRP5tYCUEt7UP9aASYzUXjsjDqzSiyi33fLTvcrEQF6Y1fZaDk4Fsju2?cluster=devnet) |
+| Sell 14,373,331 PACE back to the curve (frees allowance)             | ✅                                                                                                        | [tx](https://explorer.solana.com/tx/3FEUqg3ArHrvQ1KXQLqWPv9FhMCpeqbuCoydKiDdLmJRsf5o6U2jNPAi5adZn66SA5k4zvmCEYyioRuRW5zMKSdq?cluster=devnet) |
+| Wallet-to-wallet transfer of 11,759,998 PACE passes the hook         | ✅                                                                                                        | [tx](https://explorer.solana.com/tx/3PAyxPQcCPUDax7yamqsRxdmYUTZyNEa8cm54ELm6CAm6BMjxbiAMrr3Y9ngDnBiwFi6Efst1bVP3XaaqqEYV3nS?cluster=devnet) |
+| Final paced buy completes the curve                                  | ✅                                                                                                        | [tx](https://explorer.solana.com/tx/37fTStSriD8Xsa4AFc6W9NALU6KyYkDVeUftKD3P3S2EzjeoZHvrmNZQSF5aPyrfP6EWfUTBZpZST2xzLA6EXLm9?cluster=devnet) |
+| DBC revoked the Pacer hook on graduation                             | ✅                                                                                                        | —                                                                                                                                            |
+| Graduated into compounding DAMM v2 pool (100% LP permanently locked) | ✅                                                                                                        | [tx](https://explorer.solana.com/tx/Ef4QWjwurSCuA5v9p17TnCmQfTccyBCX1NBT9NxUUK7kXvfCaycgXULn2HLjkPyNjcvsqW8AzF2e52TNB16WhCH?cluster=devnet)  |
+
+Full machine-readable report: [`demo-runs/latest-devnet.json`](demo-runs/latest-devnet.json) (22 buys, 1 sell, every signature).
 
 ## How it works
 

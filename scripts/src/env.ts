@@ -19,7 +19,20 @@ export const CLUSTER: Cluster = (process.env.PACER_CLUSTER as Cluster | undefine
 export const RPC_URL =
   process.env.RPC_URL ?? (CLUSTER === 'devnet' ? 'https://api.devnet.solana.com' : 'http://127.0.0.1:8899')
 
-export const connection = new Connection(RPC_URL, 'confirmed')
+/** Retry HTTP 429s from public RPCs with exponential backoff (up to ~1 minute). */
+const fetchWithBackoff: typeof fetch = async (input, init) => {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(input, init)
+    if (res.status !== 429 || attempt >= 7) return res
+    await new Promise((r) => setTimeout(r, 400 * 2 ** attempt))
+  }
+}
+
+export const connection = new Connection(RPC_URL, {
+  commitment: 'confirmed',
+  fetch: fetchWithBackoff,
+  disableRetryOnRateLimit: true,
+})
 
 export function loadKeypair(path: string): Keypair {
   return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(path, 'utf8')) as number[]))

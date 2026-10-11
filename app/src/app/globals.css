@@ -1,0 +1,179 @@
+@import 'tailwindcss';
+
+/*
+ * Pacer — a chronograph dial at night.
+ * Midnight-blue dial, ivory printing, one gilt hand for the issuance clock.
+ */
+@theme {
+  --color-dial: #0b1b2e;
+  --color-case: #10243a;
+  --color-well: #081523;
+  --color-rule: #1f3650;
+  --color-rule-strong: #2e4b6b;
+  --color-ivory: #ede7d9;
+  --color-fog: #a7b4c2;
+  --color-steel: #6c819a;
+  --color-gilt: #f3b23c;
+  --color-gilt-soft: #f3b23c29;
+  --color-gilt-ink: #1a1205;
+  --color-verdigris: #4fc7a8;
+  --color-signal: #ff6f61;
+
+  --font-display: var(--font-michroma), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-martian), ui-monospace, monospace;
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+
+  --animate-sweep: sweep 60s linear infinite;
+}
+
+@keyframes sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    background: var(--color-dial);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: radial-gradient(1200px 600px at 75% -10%, #13304d 0%, transparent 60%), var(--color-dial);
+    color: var(--color-ivory);
+    font-family: var(--font-sans);
+    font-feature-settings: 'ss01', 'cv11';
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: var(--color-gilt);
+    color: var(--color-gilt-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-gilt);
+    outline-offset: 2px;
+  }
+
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+@layer utilities {
+  /* Live counters: monospaced, tabular, never jitter. */
+  .readout {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums slashed-zero;
+    letter-spacing: -0.02em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Wallet adapter, re-skinned to the dial ─────────────────────────────── */
+
+.wallet-adapter-button {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  height: 2.5rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-ivory);
+  border: 1px solid var(--color-rule-strong);
+  white-space: nowrap;
+  transition:
+    border-color 150ms,
+    background-color 150ms;
+}
+
+@media (max-width: 400px) {
+  .wallet-adapter-button {
+    padding: 0 0.875rem;
+  }
+}
+
+.wallet-adapter-button-trigger {
+  background: transparent;
+}
+
+.wallet-adapter-button:not([disabled]):hover {
+  background: var(--color-case);
+  border-color: var(--color-gilt);
+}
+
+.wallet-adapter-button:not([disabled]):focus-visible {
+  outline: 2px solid var(--color-gilt);
+  outline-offset: 2px;
+}
+
+.wallet-adapter-button-start-icon {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+}
+
+.wallet-adapter-dropdown-list {
+  background: var(--color-case);
+  border: 1px solid var(--color-rule-strong);
+  border-radius: 14px;
+  font-family: var(--font-sans);
+}
+
+.wallet-adapter-dropdown-list-item {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  border-radius: 8px;
+}
+
+.wallet-adapter-dropdown-list-item:not([disabled]):hover {
+  background: var(--color-well);
+}
+
+.wallet-adapter-modal-wrapper {
+  background: var(--color-case);
+  border: 1px solid var(--color-rule-strong);
+  border-radius: 20px;
+  font-family: var(--font-sans);
+}
+
+.wallet-adapter-modal-title {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--color-ivory);
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button {
+  border: 0;
+  border-radius: 10px;
+  height: 3rem;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button:not([disabled]):hover {
+  background: var(--color-well);
+}
+
+.wallet-adapter-modal-button-close {
+  background: var(--color-well);
+}

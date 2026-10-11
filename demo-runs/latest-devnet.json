@@ -1,0 +1,478 @@
+{
+  "cluster": "devnet",
+  "createdAt": "2026-10-11T11:59:28.861Z",
+  "params": {
+    "CLOCK_SECONDS": 300,
+    "MIGRATION_SOL": 1,
+    "OPENING_BPS": 200,
+    "MAX_PER_BUY_BPS": 800,
+    "BUYERS": 3
+  },
+  "addresses": {
+    "config": "Cjiwf76aZTsnh8tNrDH3xLK6oW4H3LwUjP5BiEAbbezV",
+    "pool": "4dYiGnoZX8cvj3pi251BfdiRUKeea3EQM3FGkqxJYRnX",
+    "mint": "2yUTsu3EavhvmhySio4o4d1epSMVnn7UPS28oMeC5Kte",
+    "paceState": "BW4mKuYSmFnefYWTYCgEUucytWaFuNvPEig3KhYqGo1G",
+    "dammPool": "7ZrjfNVvLCexDY72HdWvQvLT9Nz3QJZ9hKuLbvBVZzPx",
+    "poolExplorer": "https://explorer.solana.com/address/4dYiGnoZX8cvj3pi251BfdiRUKeea3EQM3FGkqxJYRnX?cluster=devnet",
+    "mintExplorer": "https://explorer.solana.com/address/2yUTsu3EavhvmhySio4o4d1epSMVnn7UPS28oMeC5Kte?cluster=devnet"
+  },
+  "pace": {
+    "startTs": 1791719580,
+    "openingTranche": "15999997917470",
+    "releasePerSecond": "2613332993187",
+    "maxPerBuy": "63999991669882",
+    "totalBought": "814373227336058",
+    "totalSold": "14373331462528",
+    "buys": 22,
+    "sells": 1,
+    "curveSupply": "799999895873531"
+  },
+  "migrated": true,
+  "steps": [
+    {
+      "step": "Partner creates Pacer-hooked DBC config",
+      "ok": true,
+      "signature": "zU76NnqwpXrKn3T23iCv4djh9gW4BefhxuaGRDLsfLyNE4P8X1QFqnYFhGZKp5xX3f81wnSasJ7SiNnkdBaQYnL",
+      "explorer": "https://explorer.solana.com/tx/zU76NnqwpXrKn3T23iCv4djh9gW4BefhxuaGRDLsfLyNE4P8X1QFqnYFhGZKp5xX3f81wnSasJ7SiNnkdBaQYnL?cluster=devnet"
+    },
+    {
+      "step": "Creator launches pool + starts issuance clock (one tx)",
+      "ok": true,
+      "signature": "2tmejmstg3aLcdgn6yP4PQYiCt45CtRsf58Lm3CMbzodYvYxucbBFqYTqNe7xZgWdveGVL1yJJ29QuHyQCazKbm9",
+      "detail": {
+        "pool": "4dYiGnoZX8cvj3pi251BfdiRUKeea3EQM3FGkqxJYRnX",
+        "mint": "2yUTsu3EavhvmhySio4o4d1epSMVnn7UPS28oMeC5Kte",
+        "curveSupply": "799,999,896"
+      },
+      "explorer": "https://explorer.solana.com/tx/2tmejmstg3aLcdgn6yP4PQYiCt45CtRsf58Lm3CMbzodYvYxucbBFqYTqNe7xZgWdveGVL1yJJ29QuHyQCazKbm9?cluster=devnet"
+    },
+    {
+      "step": "Sniper buys 60,799,992 PACE (under the cap, ahead of the clock)",
+      "ok": true,
+      "signature": "3cnLKCRA6Cxv4ShbXDbCxgC8sAvHLqYm49D6dcxXkxwZAiH7dM964ytgeioYetSL3GqpRthyiQiw8gVeEmtGqTxR",
+      "detail": {
+        "reverted": true,
+        "reason": "Buy is ahead of the issuance clock — wait for more supply to be released. — pacer: buy 60799992086387 > available 39519994856153 (released 39519994856153, out 0)"
+      },
+      "explorer": "https://explorer.solana.com/tx/3cnLKCRA6Cxv4ShbXDbCxgC8sAvHLqYm49D6dcxXkxwZAiH7dM964ytgeioYetSL3GqpRthyiQiw8gVeEmtGqTxR?cluster=devnet"
+    },
+    {
+      "step": "Sniper sweeps 0.3 SOL in block one",
+      "ok": true,
+      "signature": "5yEjnW4heECdMRJvfm5NHWV8jLp4P7FqeHPJSM7Q1JEaTvzyXTKjcTP25h5JWLRReDSNEWJv8nH8op66RKSPdtb8",
+      "detail": {
+        "reverted": true,
+        "reason": "Buy exceeds the maximum size per buy."
+      },
+      "explorer": "https://explorer.solana.com/tx/5yEjnW4heECdMRJvfm5NHWV8jLp4P7FqeHPJSM7Q1JEaTvzyXTKjcTP25h5JWLRReDSNEWJv8nH8op66RKSPdtb8?cluster=devnet"
+    },
+    {
+      "step": "Bot 1 buys 63,999,992 PACE in the same burst",
+      "ok": true,
+      "signature": "55jn9Q5MLxtud61k6s4bSJfueT16quJBy5XfyRD1EZXpbMsdxepXhKu6sLSHP9rxLsAZXiTRqF9DGqeehXxHGZUw",
+      "detail": {
+        "filled": true
+      },
+      "explorer": "https://explorer.solana.com/tx/55jn9Q5MLxtud61k6s4bSJfueT16quJBy5XfyRD1EZXpbMsdxepXhKu6sLSHP9rxLsAZXiTRqF9DGqeehXxHGZUw?cluster=devnet"
+    },
+    {
+      "step": "Bot 2 buys 63,999,992 PACE in the same burst",
+      "ok": true,
+      "signature": "4yptQsbLSqL4p9yChegsjuEuchmCBMCiuBptQ2E2ywyE3iE5KkwbYazVjtSUPDLpEaMDsJ5SM85d4zgVM4LR1SiZ",
+      "detail": {
+        "filled": true
+      },
+      "explorer": "https://explorer.solana.com/tx/4yptQsbLSqL4p9yChegsjuEuchmCBMCiuBptQ2E2ywyE3iE5KkwbYazVjtSUPDLpEaMDsJ5SM85d4zgVM4LR1SiZ?cluster=devnet"
+    },
+    {
+      "step": "Bot 3 buys 63,999,992 PACE in the same burst",
+      "ok": true,
+      "signature": "3EKy7mQspm7tSmNL4Ggt8Yjet4hRpHTieN8FFU6W9hWBKtmKvJfB1rvNAMKa2bzmyKoJoAmu3N9mqgcdCeZQGLHq",
+      "detail": {
+        "filled": false,
+        "reason": "Buy exceeds the burst limit — too much supply bought in a short window. — pacer: buy 63999991669882 > burst available 2613332993187"
+      },
+      "explorer": "https://explorer.solana.com/tx/3EKy7mQspm7tSmNL4Ggt8Yjet4hRpHTieN8FFU6W9hWBKtmKvJfB1rvNAMKa2bzmyKoJoAmu3N9mqgcdCeZQGLHq?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 28,746,663 PACE (t+101s)",
+      "ok": true,
+      "signature": "3gpsGEkcEZM4E6MC5pyWkjGRtH49RQ1hNRP5tYCUEt7UP9aASYzUXjsjDqzSiyi33fLTvcrEQF6Y1fZaDk4Fsju2",
+      "explorer": "https://explorer.solana.com/tx/3gpsGEkcEZM4E6MC5pyWkjGRtH49RQ1hNRP5tYCUEt7UP9aASYzUXjsjDqzSiyi33fLTvcrEQF6Y1fZaDk4Fsju2?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 26,133,330 PACE (t+111s)",
+      "ok": true,
+      "signature": "A7Gq1ENRV2C3DptKDAZc6FkkswLqHXVSzaK1yH2bYMKgMwo8yv7ut8KcXorVidfKx45CVMJMeX3HqfGmvXKuYGA",
+      "explorer": "https://explorer.solana.com/tx/A7Gq1ENRV2C3DptKDAZc6FkkswLqHXVSzaK1yH2bYMKgMwo8yv7ut8KcXorVidfKx45CVMJMeX3HqfGmvXKuYGA?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 28,746,663 PACE (t+122s)",
+      "ok": true,
+      "signature": "5xPnavpZ21KyDivFcP7nDxeSzzyE9gzXRpZyBH5DxkMvjPtd4sPRjZhX45E6vwiPp7btkgPkEJ61wdHpmt4uw7yj",
+      "explorer": "https://explorer.solana.com/tx/5xPnavpZ21KyDivFcP7nDxeSzzyE9gzXRpZyBH5DxkMvjPtd4sPRjZhX45E6vwiPp7btkgPkEJ61wdHpmt4uw7yj?cluster=devnet"
+    },
+    {
+      "step": "Sell 14,373,331 PACE back to the curve (frees allowance)",
+      "ok": true,
+      "signature": "3FEUqg3ArHrvQ1KXQLqWPv9FhMCpeqbuCoydKiDdLmJRsf5o6U2jNPAi5adZn66SA5k4zvmCEYyioRuRW5zMKSdq",
+      "detail": {
+        "netOutBefore": "211,626,639",
+        "netOutAfter": "197,253,308"
+      },
+      "explorer": "https://explorer.solana.com/tx/3FEUqg3ArHrvQ1KXQLqWPv9FhMCpeqbuCoydKiDdLmJRsf5o6U2jNPAi5adZn66SA5k4zvmCEYyioRuRW5zMKSdq?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 47,039,994 PACE (t+140s)",
+      "ok": true,
+      "signature": "2H3ZD8C1Z7bkzjotkNRWpfpWX8PhQe5mDNUavFH53Z16ye4zXCE4R3osBYf4nXEn9vZixmxkhonkt3goDCYt83LA",
+      "explorer": "https://explorer.solana.com/tx/2H3ZD8C1Z7bkzjotkNRWpfpWX8PhQe5mDNUavFH53Z16ye4zXCE4R3osBYf4nXEn9vZixmxkhonkt3goDCYt83LA?cluster=devnet"
+    },
+    {
+      "step": "Wallet-to-wallet transfer of 11,759,998 PACE passes the hook",
+      "ok": true,
+      "signature": "3PAyxPQcCPUDax7yamqsRxdmYUTZyNEa8cm54ELm6CAm6BMjxbiAMrr3Y9ngDnBiwFi6Efst1bVP3XaaqqEYV3nS",
+      "explorer": "https://explorer.solana.com/tx/3PAyxPQcCPUDax7yamqsRxdmYUTZyNEa8cm54ELm6CAm6BMjxbiAMrr3Y9ngDnBiwFi6Efst1bVP3XaaqqEYV3nS?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 44,426,661 PACE (t+157s)",
+      "ok": true,
+      "signature": "2dEaajcCfSWM8a2K9bboToHNmHtYHzA59RPVUBviA1sfjXSVBLYb6mLG7GUNaruypatQX4YJ91YMtM6Rwwfwss7z",
+      "explorer": "https://explorer.solana.com/tx/2dEaajcCfSWM8a2K9bboToHNmHtYHzA59RPVUBviA1sfjXSVBLYb6mLG7GUNaruypatQX4YJ91YMtM6Rwwfwss7z?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 26,133,330 PACE (t+167s)",
+      "ok": true,
+      "signature": "5Ah3WVAshkML6BtDPteZAJxNVkSJcbrSRbnUFCDk1zpEraH4EWgX1TH8bDN7HMrGGaHrDb2J8EGiPksVBvK7fzF3",
+      "explorer": "https://explorer.solana.com/tx/5Ah3WVAshkML6BtDPteZAJxNVkSJcbrSRbnUFCDk1zpEraH4EWgX1TH8bDN7HMrGGaHrDb2J8EGiPksVBvK7fzF3?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 31,359,996 PACE (t+179s)",
+      "ok": true,
+      "signature": "2CaGSZJKFkaJLNGuWdyWWyzy64JtMq6zoTigJMKYHYdGzyGf28pdQPWvPRSnGNvy2jxG6U4MDuMRWHoraSoXC3H8",
+      "explorer": "https://explorer.solana.com/tx/2CaGSZJKFkaJLNGuWdyWWyzy64JtMq6zoTigJMKYHYdGzyGf28pdQPWvPRSnGNvy2jxG6U4MDuMRWHoraSoXC3H8?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 36,586,662 PACE (t+193s)",
+      "ok": true,
+      "signature": "4EeUBMzNXQe7vdisPXrbm3cfFYhrQ382SyziwUxqPuZ9vXyDvqk2wpCPSUdXW2GYoLFVpadhF74D89oD55uXkcv1",
+      "explorer": "https://explorer.solana.com/tx/4EeUBMzNXQe7vdisPXrbm3cfFYhrQ382SyziwUxqPuZ9vXyDvqk2wpCPSUdXW2GYoLFVpadhF74D89oD55uXkcv1?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 44,426,661 PACE (t+210s)",
+      "ok": true,
+      "signature": "5Xu5b7UfcYvjmP8DK8dqCjeNSkofM3GMZF4L7sbX8oQy8LMTEv2bfwiT6tCJ3ZgPVS45rVCpBTJrREWTC5pGG3aY",
+      "explorer": "https://explorer.solana.com/tx/5Xu5b7UfcYvjmP8DK8dqCjeNSkofM3GMZF4L7sbX8oQy8LMTEv2bfwiT6tCJ3ZgPVS45rVCpBTJrREWTC5pGG3aY?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 31,359,996 PACE (t+222s)",
+      "ok": true,
+      "signature": "3ShaXWpsWhEw1KoneUiwoLLrsYmiB4PN5k2K6rSjn2UtPt5pCccPorqRUtZo47Mnx1PqgNPXhF9RxDGFWDYiX158",
+      "explorer": "https://explorer.solana.com/tx/3ShaXWpsWhEw1KoneUiwoLLrsYmiB4PN5k2K6rSjn2UtPt5pCccPorqRUtZo47Mnx1PqgNPXhF9RxDGFWDYiX158?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 31,359,996 PACE (t+234s)",
+      "ok": true,
+      "signature": "3FzLN3VvSdU7QPcQswhcttDWyWte8XGioXPUVf8V1K8DEeDXG6H4dPRbEvFAJGrDBMRK1nLtFP2PCLk6tCKs5MXp",
+      "explorer": "https://explorer.solana.com/tx/3FzLN3VvSdU7QPcQswhcttDWyWte8XGioXPUVf8V1K8DEeDXG6H4dPRbEvFAJGrDBMRK1nLtFP2PCLk6tCKs5MXp?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 28,746,663 PACE (t+245s)",
+      "ok": true,
+      "signature": "5ugeX8dsTSah5eUofqibaFjid3pciuCkpUvRVkMBoCHhk4UnL1tK9XBQ6a6bSRn7J5DhpwW1DWgnECaubDNpXXzZ",
+      "explorer": "https://explorer.solana.com/tx/5ugeX8dsTSah5eUofqibaFjid3pciuCkpUvRVkMBoCHhk4UnL1tK9XBQ6a6bSRn7J5DhpwW1DWgnECaubDNpXXzZ?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 26,133,330 PACE (t+255s)",
+      "ok": true,
+      "signature": "5vgRtG8Kq15385FsZy5PyYLdRpjfa9tFUjfiJxyaRw88QmmboJRsTSCM27NQt4QbcyU18qw8CjkPDpSX8Dr49BvH",
+      "explorer": "https://explorer.solana.com/tx/5vgRtG8Kq15385FsZy5PyYLdRpjfa9tFUjfiJxyaRw88QmmboJRsTSCM27NQt4QbcyU18qw8CjkPDpSX8Dr49BvH?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 36,586,662 PACE (t+269s)",
+      "ok": true,
+      "signature": "x3SEqA8GC69v81cJ7QKBCc4Vpmkqj2XjnrNxyYXojFux948qeZekyRsheAryPWkNBh2dUi7yYBA5YeNMFApc692",
+      "explorer": "https://explorer.solana.com/tx/x3SEqA8GC69v81cJ7QKBCc4Vpmkqj2XjnrNxyYXojFux948qeZekyRsheAryPWkNBh2dUi7yYBA5YeNMFApc692?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 36,586,662 PACE (t+283s)",
+      "ok": true,
+      "signature": "2g9JKjC2aonauCCkLaqjmd3F9M4JPdMPhKb1pXTfDa4vuZSc1yTErhBaqEp1U1p3wB39TBMqMoJr7WnW548TK4qp",
+      "explorer": "https://explorer.solana.com/tx/2g9JKjC2aonauCCkLaqjmd3F9M4JPdMPhKb1pXTfDa4vuZSc1yTErhBaqEp1U1p3wB39TBMqMoJr7WnW548TK4qp?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 26,133,330 PACE (t+293s)",
+      "ok": true,
+      "signature": "5136kFffbUn5wdo9yCoBkXqRRKjCnMdD52ppH9ArGMthNbbNiDp9GMzzBqxYJepayKipCQ6dmFFTZWX74tctrV7",
+      "explorer": "https://explorer.solana.com/tx/5136kFffbUn5wdo9yCoBkXqRRKjCnMdD52ppH9ArGMthNbbNiDp9GMzzBqxYJepayKipCQ6dmFFTZWX74tctrV7?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 28,746,663 PACE (t+304s)",
+      "ok": true,
+      "signature": "pKKEd3CCdZ3i2bLE78c4zvbsARuxsbDLv9Z5TtzxsKFoRtSAcdrWk3DxQgTXLXf6r3KvrLsxJRwWNukLejB1BNw",
+      "explorer": "https://explorer.solana.com/tx/pKKEd3CCdZ3i2bLE78c4zvbsARuxsbDLv9Z5TtzxsKFoRtSAcdrWk3DxQgTXLXf6r3KvrLsxJRwWNukLejB1BNw?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 36,586,662 PACE (t+318s)",
+      "ok": true,
+      "signature": "66V8G1x1fB67ZHTLQnh56Kw7pHXaaHHjE1gXMLn7bhCcDGM6H7uK9ut2gGkwTBtA73X6QEFuny9J3ovWaxvjiWj1",
+      "explorer": "https://explorer.solana.com/tx/66V8G1x1fB67ZHTLQnh56Kw7pHXaaHHjE1gXMLn7bhCcDGM6H7uK9ut2gGkwTBtA73X6QEFuny9J3ovWaxvjiWj1?cluster=devnet"
+    },
+    {
+      "step": "Paced buy 60,106,659 PACE (t+341s)",
+      "ok": true,
+      "signature": "4aTzD2nCuXva9Vh1wT1WJBJTAf5DMLTJb9J6vxDwbpYFrX5Hizhvs4bQQDPaR65w2zjCv3WrdudSSyQ7HHFoNxwf",
+      "explorer": "https://explorer.solana.com/tx/4aTzD2nCuXva9Vh1wT1WJBJTAf5DMLTJb9J6vxDwbpYFrX5Hizhvs4bQQDPaR65w2zjCv3WrdudSSyQ7HHFoNxwf?cluster=devnet"
+    },
+    {
+      "step": "Final paced buy completes the curve",
+      "ok": true,
+      "signature": "37fTStSriD8Xsa4AFc6W9NALU6KyYkDVeUftKD3P3S2EzjeoZHvrmNZQSF5aPyrfP6EWfUTBZpZST2xzLA6EXLm9",
+      "explorer": "https://explorer.solana.com/tx/37fTStSriD8Xsa4AFc6W9NALU6KyYkDVeUftKD3P3S2EzjeoZHvrmNZQSF5aPyrfP6EWfUTBZpZST2xzLA6EXLm9?cluster=devnet"
+    },
+    {
+      "step": "DBC revoked the Pacer hook on graduation",
+      "ok": true,
+      "detail": {
+        "hookProgram": "11111111111111111111111111111111"
+      }
+    },
+    {
+      "step": "Graduated into compounding DAMM v2 pool (100% LP permanently locked)",
+      "ok": true,
+      "signature": "Ef4QWjwurSCuA5v9p17TnCmQfTccyBCX1NBT9NxUUK7kXvfCaycgXULn2HLjkPyNjcvsqW8AzF2e52TNB16WhCH",
+      "detail": {
+        "dammPool": "7ZrjfNVvLCexDY72HdWvQvLT9Nz3QJZ9hKuLbvBVZzPx"
+      },
+      "explorer": "https://explorer.solana.com/tx/Ef4QWjwurSCuA5v9p17TnCmQfTccyBCX1NBT9NxUUK7kXvfCaycgXULn2HLjkPyNjcvsqW8AzF2e52TNB16WhCH?cluster=devnet"
+    }
+  ],
+  "timeline": [
+    {
+      "t": 93,
+      "released": "259039966283861",
+      "netOut": "127999983339764"
+    },
+    {
+      "t": 97,
+      "released": "269493298256609",
+      "netOut": "127999983339764"
+    },
+    {
+      "t": 101,
+      "released": "279946630229357",
+      "netOut": "127999983339764"
+    },
+    {
+      "t": 104,
+      "released": "287786629208918",
+      "netOut": "156746646264821"
+    },
+    {
+      "t": 107,
+      "released": "295626628188479",
+      "netOut": "156746646264821"
+    },
+    {
+      "t": 111,
+      "released": "306079960161227",
+      "netOut": "156746646264821"
+    },
+    {
+      "t": 115,
+      "released": "316533292133975",
+      "netOut": "182879976196691"
+    },
+    {
+      "t": 119,
+      "released": "326986624106723",
+      "netOut": "182879976196691"
+    },
+    {
+      "t": 122,
+      "released": "334826623086284",
+      "netOut": "182879976196691"
+    },
+    {
+      "t": 140,
+      "released": "381866616963650",
+      "netOut": "197253307659220"
+    },
+    {
+      "t": 157,
+      "released": "426293277847829",
+      "netOut": "244293301536586"
+    },
+    {
+      "t": 160,
+      "released": "434133276827390",
+      "netOut": "288719962420765"
+    },
+    {
+      "t": 163,
+      "released": "441973275806951",
+      "netOut": "288719962420765"
+    },
+    {
+      "t": 167,
+      "released": "452426607779699",
+      "netOut": "288719962420765"
+    },
+    {
+      "t": 169,
+      "released": "457653273766073",
+      "netOut": "314853292352635"
+    },
+    {
+      "t": 173,
+      "released": "468106605738821",
+      "netOut": "314853292352635"
+    },
+    {
+      "t": 176,
+      "released": "475946604718382",
+      "netOut": "314853292352635"
+    },
+    {
+      "t": 179,
+      "released": "483786603697943",
+      "netOut": "314853292352635"
+    },
+    {
+      "t": 182,
+      "released": "491626602677504",
+      "netOut": "346213288270879"
+    },
+    {
+      "t": 185,
+      "released": "499466601657065",
+      "netOut": "346213288270879"
+    },
+    {
+      "t": 188,
+      "released": "507306600636626",
+      "netOut": "346213288270879"
+    },
+    {
+      "t": 193,
+      "released": "520373265602561",
+      "netOut": "346213288270879"
+    },
+    {
+      "t": 210,
+      "released": "564799926486740",
+      "netOut": "382799950175497"
+    },
+    {
+      "t": 219,
+      "released": "588319923425423",
+      "netOut": "427226611059676"
+    },
+    {
+      "t": 222,
+      "released": "596159922404984",
+      "netOut": "427226611059676"
+    },
+    {
+      "t": 228,
+      "released": "611839920364106",
+      "netOut": "458586606977920"
+    },
+    {
+      "t": 234,
+      "released": "627519918323228",
+      "netOut": "458586606977920"
+    },
+    {
+      "t": 238,
+      "released": "637973250295976",
+      "netOut": "489946602896164"
+    },
+    {
+      "t": 242,
+      "released": "648426582268724",
+      "netOut": "489946602896164"
+    },
+    {
+      "t": 245,
+      "released": "656266581248285",
+      "netOut": "489946602896164"
+    },
+    {
+      "t": 252,
+      "released": "674559912200594",
+      "netOut": "518693265821221"
+    },
+    {
+      "t": 255,
+      "released": "682399911180155",
+      "netOut": "518693265821221"
+    },
+    {
+      "t": 264,
+      "released": "705919908118838",
+      "netOut": "544826595753091"
+    },
+    {
+      "t": 269,
+      "released": "718986573084773",
+      "netOut": "544826595753091"
+    },
+    {
+      "t": 283,
+      "released": "755573234989391",
+      "netOut": "581413257657709"
+    },
+    {
+      "t": 289,
+      "released": "771253232948513",
+      "netOut": "617999919562327"
+    },
+    {
+      "t": 293,
+      "released": "781706564921261",
+      "netOut": "617999919562327"
+    },
+    {
+      "t": 298,
+      "released": "794773229887196",
+      "netOut": "644133249494197"
+    },
+    {
+      "t": 301,
+      "released": "802613228866757",
+      "netOut": "644133249494197"
+    },
+    {
+      "t": 304,
+      "released": "810453227846318",
+      "netOut": "644133249494197"
+    },
+    {
+      "t": 309,
+      "released": "823519892812253",
+      "netOut": "672879912419254"
+    },
+    {
+      "t": 313,
+      "released": "833973224785001",
+      "netOut": "672879912419254"
+    },
+    {
+      "t": 318,
+      "released": "847039889750936",
+      "netOut": "672879912419254"
+    },
+    {
+      "t": 341,
+      "released": "907146548594237",
+      "netOut": "709466574323872"
+    },
+    {
+      "t": 362,
+      "released": "962026541451164",
+      "netOut": "769573233167173"
+    }
+  ]
+}
