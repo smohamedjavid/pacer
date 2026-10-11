@@ -1,6 +1,6 @@
 # @pacer/scripts
 
-Operational scripts and integration tests. All commands take `PACER_CLUSTER=localnet|devnet` (default `localnet`) and optional `RPC_URL`; the signer is `.keys/deployer.json` (override with `DEPLOYER_KEYPAIR`).
+Operational scripts and integration tests. All commands take `PACER_CLUSTER=localnet|devnet` (default `localnet`) and optional `RPC_URL`, from the shell or a gitignored `scripts/.env.local`; the signer is `.keys/deployer.json` (override with `DEPLOYER_KEYPAIR`).
 
 | Command                                      | What it does                                                                                                                                                                |
 | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

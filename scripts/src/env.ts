@@ -1,4 +1,4 @@
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -11,6 +11,11 @@ import {
   Transaction,
   sendAndConfirmTransaction,
 } from '@solana/web3.js'
+
+// Optional, gitignored scripts/.env.local (e.g. PACER_CLUSTER=devnet, RPC_URL=<private RPC>).
+// Variables already set in the shell take precedence.
+const LOCAL_ENV = resolve(dirname(fileURLToPath(import.meta.url)), '../.env.local')
+if (existsSync(LOCAL_ENV)) process.loadEnvFile(LOCAL_ENV)
 
 export type Cluster = 'localnet' | 'devnet'
 
