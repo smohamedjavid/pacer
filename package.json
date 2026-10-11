@@ -13,7 +13,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "dev": "pnpm --filter @pacer/app dev",
-    "build:app": "pnpm --filter @pacer/app build"
+    "build:app": "pnpm --filter @pacer/app build",
+    "readme:devnet": "node bin/readme-devnet.mjs"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

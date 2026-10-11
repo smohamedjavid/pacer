@@ -390,7 +390,7 @@ async function main() {
   const report = {
     cluster: CLUSTER,
     createdAt: new Date().toISOString(),
-    params: { CLOCK_SECONDS, MIGRATION_SOL, OPENING_BPS, MAX_PER_BUY_BPS, BUYERS },
+    params: { CLOCK_SECONDS, MIGRATION_SOL, OPENING_BPS, MAX_PER_BUY_BPS, BURST_BPS, SWEEP_SOL, BUYERS },
     addresses: {
       config: configKp.publicKey.toBase58(),
       pool: pool.toBase58(),

@@ -99,10 +99,12 @@ export async function sendExpectFailure(tx: Transaction, signers: Keypair[]): Pr
   await connection
     .confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed')
     .catch(() => undefined)
-  const landed = await connection.getTransaction(signature, {
-    commitment: 'confirmed',
-    maxSupportedTransactionVersion: 0,
-  })
+  // Public RPCs can lag behind confirmation; poll before concluding the transaction never landed.
+  let landed = null
+  for (let attempt = 0; attempt < 10 && !landed; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 1_500))
+    landed = await connection.getTransaction(signature, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 })
+  }
   if (!landed) return { ok: false, signature, error: 'transaction did not land' }
   return { ok: !landed.meta?.err, signature, logs: landed.meta?.logMessages ?? undefined }
 }
