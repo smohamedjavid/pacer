@@ -1,7 +1,7 @@
 /**
  * Integration tests against Meteora's DBC program (cloned into a local validator) and Pacer.
  *
- *   ./scripts/localnet.sh        # in another terminal
+ *   pnpm localnet                # in another terminal (bin/localnet.sh)
  *   pnpm --filter @pacer/scripts test
  */
 import assert from 'node:assert/strict'
@@ -263,6 +263,27 @@ describe('pacer', { skip: CLUSTER !== 'localnet' && 'integration tests run on lo
     assert.ok(after.netOut < after.openingTranche, 'clock allowance was not the binding limit')
   })
 
+  test('buying and selling straight back cannot keep the burst bucket empty', async () => {
+    // 50% released at open, burst 10%, no refill during the test.
+    const { mint, pool } = await launch({
+      openingBps: 5_000,
+      clockSeconds: 1_000_000,
+      maxPerBuyBps: 0,
+      burstBps: 1_000,
+    })
+    const griefer = await buyer(6)
+    const honest = await buyer(6)
+    const pace = (await fetchPaceState(connection, mint))!
+    const full = pace.burstCapacity - pace.burstCapacity / 100n
+    assert.ok((await buy(griefer, pool, full)).ok, 'griefer drains the bucket')
+    const ata = getAssociatedTokenAddressSync(mint, griefer.publicKey, false, TOKEN_2022_PROGRAM_ID)
+    const bal = BigInt((await connection.getTokenAccountBalance(ata)).value.amount)
+    const sell = await buildSellTx(connection, { owner: griefer.publicKey, pool, baseAmountIn: new BN(bal.toString()) })
+    assert.ok((await send(sell, [griefer])).ok, 'griefer sells straight back')
+    const res = await buy(honest, pool, full / 2n)
+    assert.ok(res.ok, `an honest buyer must not be locked out: ${anchorError(res.logs) ?? res.error}`)
+  })
+
   test('the price model matches the live DBC price (price speed limit is exact)', async () => {
     const { mint, pool } = await launch()
     const b = await buyer()
@@ -274,7 +295,7 @@ describe('pacer', { skip: CLUSTER !== 'localnet' && 'integration tests run on lo
     const cfg = (await client.state.getPoolConfig(state.poolState.config))!
     const model = priceAtNetOut(cfg, new BN(after.netOut.toString()))
     const live = getPriceFromSqrtPrice(state.poolState.sqrtPrice, 6, 9).toNumber()
-    assert.ok(Math.abs(model - live) / live < 1e-9, `model ${model} vs live ${live}`)
+    assert.ok(Math.abs(model - live) / live < 1e-12, `model ${model} vs live ${live}`)
   })
 
   test('base-token fee claims from the curve vault are not metered as buys', async () => {
@@ -305,7 +326,7 @@ describe('pacer', { skip: CLUSTER !== 'localnet' && 'integration tests run on lo
     const pool = launchRes.pool
     const b = await buyer(6)
     const pace = (await fetchPaceState(connection, mint))!
-    // Drain the burst bucket completely, so any metered outflow would revert.
+    // Drain the burst bucket to 2% of capacity, so any metered outflow would revert.
     assert.ok((await buy(b, pool, pace.burstCapacity - pace.burstCapacity / 50n)).ok)
     const before = (await fetchPaceState(connection, mint))!
 

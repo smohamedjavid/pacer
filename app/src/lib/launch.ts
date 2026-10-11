@@ -144,7 +144,10 @@ export async function fetchLaunches(connection: Connection): Promise<LaunchSumma
   const program = dbcClient(connection).state.getProgram()
   const [pools, mints] = await Promise.all([
     program.account.transferHookPool.fetchMultiple(paces.map((p) => p.pool)),
-    connection.getMultipleAccountsInfo(paces.map((p) => p.mint)),
+    getMultipleAccountsChunked(
+      connection,
+      paces.map((p) => p.mint)
+    ),
   ])
 
   const launches = await Promise.all(
@@ -204,4 +207,12 @@ export async function fetchLaunch(connection: Connection, mint: PublicKey): Prom
     poolConfig,
     dammPool: deriveDammV2PoolAddress(DAMM_V2_CUSTOMIZABLE_MIGRATION_CONFIG, mint, poolConfig.quoteMint),
   }
+}
+
+/** `getMultipleAccountsInfo` accepts at most 100 keys per call. */
+async function getMultipleAccountsChunked(connection: Connection, keys: PublicKey[]) {
+  const chunks: PublicKey[][] = []
+  for (let i = 0; i < keys.length; i += 100) chunks.push(keys.slice(i, i + 100))
+  const results = await Promise.all(chunks.map((c) => connection.getMultipleAccountsInfo(c)))
+  return results.flat()
 }

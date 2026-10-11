@@ -101,7 +101,8 @@ export function LaunchBoard() {
               </li>
             ))}
           </ul>
-        ) : error ? (
+        ) : !launches ? (
+          // Only without data: a failed background refetch keeps showing the last good list.
           <div role="alert" className="flex flex-wrap items-center justify-between gap-4 px-5 py-6">
             <p className="text-fog">
               Could not load launches from the RPC. <span className="text-steel">{describeError(error)}</span>

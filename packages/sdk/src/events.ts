@@ -33,6 +33,7 @@ export interface PaceInitializedEvent {
   openingTranche: bigint
   releasePerSecond: bigint
   maxPerBuy: bigint
+  burstCapacity: bigint
 }
 
 export type PacerEvent = PacedBuyEvent | PacedSellEvent | PaceInitializedEvent
@@ -83,6 +84,7 @@ function toPacerEvent(name: string, data: Record<string, unknown>): PacerEvent |
         openingTranche: toBigInt(data.opening_tranche),
         releasePerSecond: toBigInt(data.release_per_second),
         maxPerBuy: toBigInt(data.max_per_buy),
+        burstCapacity: toBigInt(data.burst_capacity),
       }
     default:
       return null

@@ -313,12 +313,7 @@ export type Pacer = {
     {
       "code": 6007,
       "name": "invalidParams",
-      "msg": "Opening tranche or release rate must be non-zero"
-    },
-    {
-      "code": 6008,
-      "name": "mathOverflow",
-      "msg": "Math overflow"
+      "msg": "Invalid schedule: needs an opening tranche or a release rate, and a burst limit needs a release rate"
     }
   ],
   "types": [

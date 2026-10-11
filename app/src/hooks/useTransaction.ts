@@ -69,3 +69,6 @@ export function useTransaction() {
 
   return { state, run, reset, busy: state.status === 'pending' }
 }
+
+/** What `useTransaction` returns; shared between trade tabs. */
+export type TransactionHandle = ReturnType<typeof useTransaction>

@@ -5,7 +5,7 @@ Pacer adds one rule to a Meteora Dynamic Bonding Curve (DBC) launch: supply leav
 ```text
 released(t) = opening_tranche + release_per_second · (t − start_ts)
 buy allowed  ⇔  net_out_after_buy ≤ released(now)
-               ∧  amount ≤ burst_level(now)        (token bucket, refills at release_per_second, capped)
+               ∧  amount ≤ burst_level(now)        (token bucket: refills at release_per_second and on sells, capped)
                ∧  amount ≤ max_per_buy
 net_out      = initial_base_reserve − pool.base_reserve        (read from DBC)
 price(t)     ≤ curve_price(min(released(t), curve_supply))     (the price speed limit)
@@ -46,15 +46,15 @@ sequenceDiagram
 
     Partner->>DBC: create_config_with_transfer_hook(hook = Pacer, Token-2022, compounding DAMM v2 migration)
     Creator->>DBC: initialize_virtual_pool_with_token2022_transfer_hook
-    Creator->>Pacer: initialize_pace(opening, rate, max_per_buy)  [same transaction]
-    Note over Pacer: checks pool owner/discriminator,<br/>base_mint, creator signer, mint hook = Pacer<br/>stores initial_base_reserve, start_ts
+    Creator->>Pacer: initialize_pace(opening, rate, max_per_buy, burst_capacity)  [same transaction]
+    Note over Pacer: checks pool owner/discriminator,<br/>base_mint, creator signer, mint hook = Pacer<br/>stores initial_base_reserve, start_ts, burst bucket
 
     Buyer->>DBC: swap2_with_transfer_hook (quote → base)
     DBC->>DBC: apply swap to reserves
     DBC->>T22: transfer_checked(base_vault → buyer)
     T22->>Pacer: execute(amount)
-    Pacer->>Pacer: net_out = initial − pool.base_reserve<br/>require net_out ≤ released(now), amount ≤ max
-    Pacer-->>T22: ok / AheadOfClock / ExceedsMaxPerBuy
+    Pacer->>Pacer: net_out = initial − pool.base_reserve<br/>require net_out ≤ released(now), taken ≤ max, taken ≤ bucket
+    Pacer-->>T22: ok / AheadOfClock / ExceedsMaxPerBuy / BurstLimit
 
     Buyer->>DBC: final buy reaches migration_quote_threshold
     DBC->>T22: revoke transfer hook program + authority
@@ -85,9 +85,9 @@ DBC once offered a "rate limiter" base-fee mode (deprecated for new configs) tha
 ## Design choices
 
 - **`net_out` comes from DBC, not from the hook.** Counting transfers in and out of the vault is spoofable (anyone can transfer tokens _into_ the vault). DBC applies each swap to `base_reserve` before it moves tokens, so reading the reserve inside the hook gives the exact post-trade supply outside the curve.
-- **A burst bucket on top of the clock.** A cumulative schedule alone lets allowance accumulate during quiet periods and be swept in one block. The bucket refills at the clock's rate up to a capacity, so any short window is bounded across all wallets. It needs per-launch state, which declarative hook rule engines don't keep.
+- **A burst bucket on top of the clock.** A cumulative schedule alone lets allowance accumulate during quiet periods and be swept in one block. The bucket refills at the clock's rate up to a capacity, so any short window is bounded across all wallets. Sells refill it too, so it bounds _net_ outflow per window: buying and selling straight back can't keep it empty for everyone else. It needs per-launch state, which declarative hook rule engines don't keep.
 - **The price ceiling is a by-product, computed exactly.** Capping supply out of the curve caps the curve price. `priceAtNetOut` walks DBC's constant-product segments from the start price; a test checks it against the pool's live `sqrt_price`.
 - **Creator sets the schedule at launch, once.** No update instruction exists. A published schedule that can't change is the point.
 - **Exact-out buys.** The SDK and app buy the exact base amount the clock has released, so buyers don't overshoot and revert.
-- **Flat curve fee.** Pacer replaces punitive anti-snipe fees (up to 99% decaying), so the demo config uses a flat 1% fee and lets the clock do the work.
+- **Low, steady curve fee.** Pacer replaces punitive anti-snipe fees (up to 99% decaying), so the demo config uses a 1% base fee (plus DBC's volatility-based dynamic fee) and lets the clock do the work.
 - **All graduated LP permanently locked, compounding.** The DAMM v2 pool can't be drained after graduation, and fees deepen liquidity over time.

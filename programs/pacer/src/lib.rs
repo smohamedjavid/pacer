@@ -223,8 +223,18 @@ pub mod pacer {
                 ts: now,
             });
         } else if net_out < pace.net_out {
-            // Sell through DBC: supply returned to the curve frees allowance.
+            // Sell through DBC: supply returned to the curve frees clock allowance and refills
+            // the burst bucket, so the bucket limits *net* outflow per window. Otherwise anyone
+            // could keep the shared bucket empty by buying and selling straight back.
             let returned = pace.net_out - net_out;
+            if pace.burst_capacity > 0 {
+                let now = Clock::get()?.unix_timestamp;
+                pace.burst_level = pace
+                    .burst_level_at(now)
+                    .saturating_add(returned)
+                    .min(pace.burst_capacity);
+                pace.burst_updated_ts = now;
+            }
             pace.net_out = net_out;
             pace.total_sold = pace.total_sold.saturating_add(returned);
             pace.sells = pace.sells.saturating_add(1);
@@ -420,10 +430,8 @@ pub enum PacerError {
     NotPoolCreator,
     #[msg("Mint's transfer hook is not Pacer")]
     MintNotPaced,
-    #[msg("Opening tranche or release rate must be non-zero")]
+    #[msg("Invalid schedule: needs an opening tranche or a release rate, and a burst limit needs a release rate")]
     InvalidParams,
-    #[msg("Math overflow")]
-    MathOverflow,
 }
 
 #[cfg(test)]

@@ -253,7 +253,9 @@ async function main() {
   let transferredOnce = false
   const minSlice = (curveTotal * BigInt(MIN_SLICE_BPS)) / 10_000n
 
+  const deadline = Date.now() + (CLOCK_SECONDS + 600) * 1000
   for (;;) {
+    if (Date.now() > deadline) throw new Error('curve did not complete within the clock + 10 minutes')
     pace = (await fetchPaceState(connection, mint))!
     const now = await chainTime()
     const released = releasedAt(pace, now)

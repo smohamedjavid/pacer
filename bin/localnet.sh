@@ -8,7 +8,7 @@ DBC=dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN
 DAMM_V2=cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG
 DBC_POOL_AUTHORITY=FhVo3mqL8PW5pH5U2CN4XE33DokiyZnUwuGpH2hmHLuM  # fronts migration rent
 DAMM_V2_CUSTOMIZABLE_CONFIG=A8gMrEPJkacWkcb3DGwtJwTe16HktSEfvwtuDh2MCtck
-PACER=$(solana-keygen pubkey target/deploy/pacer-keypair.json)
+PACER=4AX6qNnFYqLqKLvcSe6FkvCJWJsoBF9pK743UmEYLokM  # declare_id! in programs/pacer/src/lib.rs
 DEPLOYER=${DEPLOYER_KEYPAIR:-.keys/deployer.json}
 
 [[ -f target/deploy/pacer.so ]] || anchor build

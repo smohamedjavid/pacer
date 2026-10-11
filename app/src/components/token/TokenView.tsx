@@ -85,6 +85,9 @@ export function TokenView({ mint: mintAddress }: { mint: string }) {
     <div className="mx-auto max-w-6xl px-4 pt-10 sm:px-6">
       {isPending ? (
         <LoadingState />
+      ) : launch ? (
+        // Keep showing loaded data when a background refetch fails (e.g. an RPC 429).
+        <Launch launch={launch} />
       ) : error instanceof LegacyLaunchError ? (
         <Message
           title="Launch from an older Pacer version"
@@ -105,7 +108,7 @@ export function TokenView({ mint: mintAddress }: { mint: string }) {
             </button>
           }
         />
-      ) : launch === null ? (
+      ) : (
         <Message
           title="No issuance clock on this token"
           body="This mint was not launched with Pacer on this cluster. Check the address, or pick a launch from the list."
@@ -115,8 +118,6 @@ export function TokenView({ mint: mintAddress }: { mint: string }) {
             </Link>
           }
         />
-      ) : (
-        <Launch launch={launch} />
       )}
     </div>
   )

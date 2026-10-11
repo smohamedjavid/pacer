@@ -64,6 +64,14 @@ export interface PaceSchedule {
 
 /** Turn a human schedule ("5% at open, the rest over 4 hours, max 1% per buy") into on-chain params. */
 export function paceParamsFromSchedule(s: PaceSchedule): PaceParams {
+  const isBps = (v: number) => Number.isInteger(v) && v >= 0 && v <= 10_000
+  if (!Number.isInteger(s.clockSeconds) || s.clockSeconds <= 0) {
+    throw new RangeError(`clockSeconds must be a positive integer, got ${s.clockSeconds}`)
+  }
+  if (!isBps(s.openingBps) || !isBps(s.maxPerBuyBps) || !isBps(s.burstBps ?? 0)) {
+    throw new RangeError('openingBps, maxPerBuyBps and burstBps must be integers between 0 and 10000')
+  }
+  if (s.curveSupply.isZero()) throw new RangeError('curveSupply must be positive')
   const openingTranche = s.curveSupply.muln(s.openingBps).divn(10_000)
   const rest = s.curveSupply.sub(openingTranche)
   // Round up so the whole curve is released exactly at the end of the clock.
@@ -139,9 +147,13 @@ export async function fetchPaceState(connection: Connection, mint: PublicKey): P
 }
 
 /** Supply the issuance clock has released at `nowSec` (mirrors `PaceState::released_at`). */
+const U64_MAX = (1n << 64n) - 1n
+
 export function releasedAt(state: PaceStateView, nowSec: number): bigint {
   const elapsed = BigInt(Math.max(0, nowSec - state.startTs))
-  return state.openingTranche + state.releasePerSecond * elapsed
+  const released = state.openingTranche + state.releasePerSecond * elapsed
+  // Mirror the program's saturating u64 arithmetic.
+  return released > U64_MAX ? U64_MAX : released
 }
 
 /** Burst bucket level at `nowSec` (mirrors `PaceState::burst_level_at`); `null` when no burst limit. */

@@ -103,7 +103,8 @@ export async function sendExpectFailure(tx: Transaction, signers: Keypair[]): Pr
     commitment: 'confirmed',
     maxSupportedTransactionVersion: 0,
   })
-  return { ok: !landed?.meta?.err, signature, logs: landed?.meta?.logMessages ?? undefined }
+  if (!landed) return { ok: false, signature, error: 'transaction did not land' }
+  return { ok: !landed.meta?.err, signature, logs: landed.meta?.logMessages ?? undefined }
 }
 
 /** Return leftover SOL from throwaway demo wallets to the deployer (devnet hygiene). */

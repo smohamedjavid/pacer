@@ -9,18 +9,28 @@ import { buttonStyles } from '@/components/ui/button-styles'
 import { TxStatus } from '@/components/ui/TxStatus'
 import { ConnectWalletButton } from '@/components/wallet/ConnectWalletButton'
 import { useBalances } from '@/hooks/useBalances'
-import { useTransaction } from '@/hooks/useTransaction'
+import type { TransactionHandle } from '@/hooks/useTransaction'
 import { formatSol, formatTokens } from '@/lib/format'
 import type { LaunchDetail } from '@/lib/launch'
 import { queryKeys } from '@/lib/query-keys'
 import { quoteSell } from '@/lib/quote'
 import { BASE_DECIMALS, parseUnits, unitsToDecimalString } from '@/lib/units'
 
-export function SellForm({ launch, now, symbol }: { launch: LaunchDetail; now: number; symbol: string }) {
+export function SellForm({
+  launch,
+  now,
+  symbol,
+  tx,
+}: {
+  launch: LaunchDetail
+  now: number
+  symbol: string
+  /** Shared with the other trade tab so a pending transaction survives a tab switch. */
+  tx: TransactionHandle
+}) {
   const { connection } = useConnection()
   const { publicKey } = useWallet()
   const { data: balances } = useBalances(launch.mint)
-  const tx = useTransaction()
   const [input, setInput] = useState('')
 
   const held = balances?.tokens ?? 0n

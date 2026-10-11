@@ -1,6 +1,7 @@
 'use client'
 
 import { useId, useState, type KeyboardEvent } from 'react'
+import { useTransaction } from '@/hooks/useTransaction'
 import type { LaunchDetail } from '@/lib/launch'
 import { BuyForm } from './BuyForm'
 import { SellForm } from './SellForm'
@@ -11,12 +12,21 @@ type Tab = (typeof TABS)[number]
 export function TradePanel({ launch, now, symbol }: { launch: LaunchDetail; now: number; symbol: string }) {
   const [tab, setTab] = useState<Tab>('buy')
   const id = useId()
+  // One transaction for the panel: switching tabs can't drop a pending trade or start a second.
+  const tx = useTransaction()
+
+  function select(next: Tab) {
+    if (tx.busy || next === tab) return
+    tx.reset()
+    setTab(next)
+  }
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
     event.preventDefault()
+    if (tx.busy) return
     const next = tab === 'buy' ? 'sell' : 'buy'
-    setTab(next)
+    select(next)
     document.getElementById(`${id}-tab-${next}`)?.focus()
   }
 
@@ -37,9 +47,14 @@ export function TradePanel({ launch, now, symbol }: { launch: LaunchDetail; now:
             aria-selected={tab === t}
             aria-controls={`${id}-panel`}
             tabIndex={tab === t ? 0 : -1}
-            onClick={() => setTab(t)}
+            disabled={tx.busy && tab !== t}
+            onClick={() => select(t)}
             className={`rounded-full py-2 text-sm font-semibold transition-colors ${
-              tab === t ? (t === 'buy' ? 'bg-gilt text-gilt-ink' : 'bg-ivory text-dial') : 'text-fog hover:text-ivory'
+              tab === t
+                ? t === 'buy'
+                  ? 'bg-gilt text-gilt-ink'
+                  : 'bg-ivory text-dial'
+                : 'text-fog hover:text-ivory disabled:cursor-not-allowed disabled:opacity-40'
             }`}
           >
             {t === 'buy' ? 'Buy' : 'Sell'}
@@ -48,9 +63,9 @@ export function TradePanel({ launch, now, symbol }: { launch: LaunchDetail; now:
       </div>
       <div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-tab-${tab}`} className="mt-5">
         {tab === 'buy' ? (
-          <BuyForm launch={launch} now={now} symbol={symbol} />
+          <BuyForm launch={launch} now={now} symbol={symbol} tx={tx} />
         ) : (
-          <SellForm launch={launch} now={now} symbol={symbol} />
+          <SellForm launch={launch} now={now} symbol={symbol} tx={tx} />
         )}
       </div>
     </section>

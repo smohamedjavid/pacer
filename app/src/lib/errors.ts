@@ -23,8 +23,11 @@ export function explainFailure(logs: readonly string[] | null | undefined, fallb
     const match = ANCHOR_MESSAGE.exec(line)
     if (match?.[1]) return match[1]
   }
-  if (list.some((l) => l.includes('insufficient lamports') || l.includes('insufficient funds'))) {
+  if (list.some((l) => l.includes('insufficient lamports'))) {
     return 'Not enough SOL in this wallet to cover the trade and fees.'
+  }
+  if (list.some((l) => l.includes('insufficient funds'))) {
+    return 'Not enough balance in this wallet for this trade.'
   }
   return fallback
 }

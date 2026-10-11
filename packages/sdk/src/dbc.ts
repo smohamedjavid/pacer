@@ -63,7 +63,7 @@ export const DEFAULT_PACED_CURVE: PacedCurveOptions = {
 /**
  * DBC config used by every Pacer launch:
  * - Token-2022 base mint with the Pacer transfer hook (set on the config)
- * - flat curve fee — the issuance clock, not a 99% snipe tax, handles bots
+ * - 1% base fee plus DBC's dynamic fee: the issuance clock, not a 99% snipe tax, handles bots
  * - graduation into a compounding DAMM v2 pool with dynamic fees
  * - 100% of graduated LP permanently locked (split partner/creator)
  */

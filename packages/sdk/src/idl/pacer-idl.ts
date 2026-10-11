@@ -310,12 +310,7 @@ export const PACER_IDL_JSON = {
     {
       "code": 6007,
       "name": "InvalidParams",
-      "msg": "Opening tranche or release rate must be non-zero"
-    },
-    {
-      "code": 6008,
-      "name": "MathOverflow",
-      "msg": "Math overflow"
+      "msg": "Invalid schedule: needs an opening tranche or a release rate, and a burst limit needs a release rate"
     }
   ],
   "types": [

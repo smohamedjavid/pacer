@@ -60,11 +60,11 @@ export function ActivityFeed({ activity, startTs, now, symbol, tradeCount, error
           aria-live="polite"
           aria-relevant="additions"
         >
-          {items.map((item, i) => {
+          {items.map((item) => {
             const at = item.kind === 'buy' ? item.ts : item.blockTime
             return (
               <li
-                key={`${item.signature}-${i}`}
+                key={`${item.signature}:${item.kind}:${'netOut' in item ? item.netOut : ''}`}
                 className="grid grid-cols-[4.5rem_1fr_auto] items-baseline gap-3 px-4 py-2.5 text-sm sm:px-5"
               >
                 <span className={`font-semibold ${KIND[item.kind].className}`}>{KIND[item.kind].label}</span>
