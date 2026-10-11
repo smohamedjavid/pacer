@@ -96,6 +96,12 @@ export const PACER_IDL_JSON = {
               }
             ]
           }
+        },
+        {
+          "name": "pool",
+          "relations": [
+            "pace_state"
+          ]
         }
       ],
       "args": [
@@ -406,9 +412,16 @@ export const PACER_IDL_JSON = {
             "type": "u64"
           },
           {
+            "name": "initial_base_reserve",
+            "docs": [
+              "DBC `base_reserve` when the clock started; `net_out` is measured against it."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "net_out",
             "docs": [
-              "Net base units that have left the curve vault (bought minus sold)."
+              "Net base units that have left the curve (bought minus sold), per DBC's reserves."
             ],
             "type": "u64"
           },

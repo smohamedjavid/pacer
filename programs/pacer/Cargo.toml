@@ -31,3 +31,6 @@ spl-transfer-hook-interface = "=0.10.0"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
+
+[dev-dependencies]
+sha2 = "0.10"

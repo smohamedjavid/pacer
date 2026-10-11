@@ -19,6 +19,8 @@ export const DAMM_V2_CUSTOMIZABLE_MIGRATION_CONFIG = new PublicKey(
 )
 
 export const PACE_SEED = Buffer.from('pace')
+/** On-chain size of a `PaceState` account (8-byte discriminator + fields). */
+export const PACE_STATE_SIZE = 8 + 4 * 32 + 8 + 7 * 8 + 2 * 4 + 1
 export const EXTRA_ACCOUNT_METAS_SEED = Buffer.from('extra-account-metas')
 
 export function derivePaceState(mint: PublicKey): PublicKey {
@@ -103,6 +105,7 @@ export interface PaceStateView {
   openingTranche: bigint
   releasePerSecond: bigint
   maxPerBuy: bigint
+  initialBaseReserve: bigint
   netOut: bigint
   totalBought: bigint
   totalSold: bigint
@@ -128,6 +131,7 @@ export async function fetchPaceState(
     openingTranche: BigInt(s.openingTranche.toString()),
     releasePerSecond: BigInt(s.releasePerSecond.toString()),
     maxPerBuy: BigInt(s.maxPerBuy.toString()),
+    initialBaseReserve: BigInt(s.initialBaseReserve.toString()),
     netOut: BigInt(s.netOut.toString()),
     totalBought: BigInt(s.totalBought.toString()),
     totalSold: BigInt(s.totalSold.toString()),
@@ -183,7 +187,8 @@ export function pacerErrorFromLogs(logs: string[] | null | undefined): string | 
 /** All paced launches, newest first. */
 export async function fetchAllPaceStates(connection: Connection): Promise<PaceStateView[]> {
   const program = getPacerProgram(connection)
-  const all = await program.account.paceState.all()
+  // Filter by size so accounts from older program layouts are skipped, not mis-decoded.
+  const all = await program.account.paceState.all([{ dataSize: PACE_STATE_SIZE }])
   return all
     .map(({ publicKey, account: s }) => ({
       address: publicKey,
@@ -195,6 +200,7 @@ export async function fetchAllPaceStates(connection: Connection): Promise<PaceSt
       openingTranche: BigInt(s.openingTranche.toString()),
       releasePerSecond: BigInt(s.releasePerSecond.toString()),
       maxPerBuy: BigInt(s.maxPerBuy.toString()),
+      initialBaseReserve: BigInt(s.initialBaseReserve.toString()),
       netOut: BigInt(s.netOut.toString()),
       totalBought: BigInt(s.totalBought.toString()),
       totalSold: BigInt(s.totalSold.toString()),

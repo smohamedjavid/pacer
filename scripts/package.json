@@ -6,7 +6,8 @@
   "scripts": {
     "demo": "tsx src/demo.ts",
     "create-config": "tsx src/create-config.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "tsx --test --test-concurrency=1 src/tests/*.test.ts"
   },
   "dependencies": {
     "@pacer/sdk": "workspace:*",

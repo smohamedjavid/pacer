@@ -99,6 +99,12 @@ export type Pacer = {
               }
             ]
           }
+        },
+        {
+          "name": "pool",
+          "relations": [
+            "paceState"
+          ]
         }
       ],
       "args": [
@@ -409,9 +415,16 @@ export type Pacer = {
             "type": "u64"
           },
           {
+            "name": "initialBaseReserve",
+            "docs": [
+              "DBC `base_reserve` when the clock started; `net_out` is measured against it."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "netOut",
             "docs": [
-              "Net base units that have left the curve vault (bought minus sold)."
+              "Net base units that have left the curve (bought minus sold), per DBC's reserves."
             ],
             "type": "u64"
           },

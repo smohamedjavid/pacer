@@ -5,12 +5,19 @@
 //! completes. Pacer only constrains one thing: how much supply may leave the curve vault
 //! by time `t`:
 //!
-//!     net_out(t) <= opening_tranche + release_per_second * (t - start_ts)
+//! ```text
+//! net_out(t) <= opening_tranche + release_per_second * (t - start_ts)
+//! ```
 //!
 //! A buyer (or bot) can never take more than the clock has released, so a one-block sweep
 //! of the curve reverts and price discovery is spread over a schedule the creator publishes
 //! at launch. Sells return supply to the vault and free allowance; wallet-to-wallet
 //! transfers are never touched.
+//!
+//! `net_out` is never tracked by Pacer itself: it is read from DBC's own pool accounting
+//! (`initial_base_reserve - base_reserve`), which DBC updates before it moves tokens. Tokens
+//! donated straight to the vault, or hook calls outside a real transfer of this mint, can
+//! therefore never change the allowance.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::spl_token_2022::{
@@ -21,8 +28,10 @@ use anchor_spl::token_2022::spl_token_2022::{
     },
     state::{Account as SplTokenAccount, Mint as SplMint},
 };
-use spl_tlv_account_resolution::{account::ExtraAccountMeta, seeds::Seed, state::ExtraAccountMetaList};
 use spl_discriminator::SplDiscriminate;
+use spl_tlv_account_resolution::{
+    account::ExtraAccountMeta, seeds::Seed, state::ExtraAccountMetaList,
+};
 use spl_transfer_hook_interface::instruction::ExecuteInstruction;
 
 declare_id!("4AX6qNnFYqLqKLvcSe6FkvCJWJsoBF9pK743UmEYLokM");
@@ -42,6 +51,7 @@ mod dbc_pool {
     pub const CREATOR: usize = 104;
     pub const BASE_MINT: usize = 136;
     pub const BASE_VAULT: usize = 168;
+    pub const BASE_RESERVE: usize = 232;
 }
 
 #[program]
@@ -76,20 +86,30 @@ pub mod pacer {
         let creator = read_pubkey(&pool_data, dbc_pool::CREATOR);
         let base_mint = read_pubkey(&pool_data, dbc_pool::BASE_MINT);
         let base_vault = read_pubkey(&pool_data, dbc_pool::BASE_VAULT);
+        let initial_base_reserve = read_u64(&pool_data, dbc_pool::BASE_RESERVE);
         require_keys_eq!(base_mint, ctx.accounts.mint.key(), PacerError::InvalidPool);
-        require_keys_eq!(creator, ctx.accounts.creator.key(), PacerError::NotPoolCreator);
+        require_keys_eq!(
+            creator,
+            ctx.accounts.creator.key(),
+            PacerError::NotPoolCreator
+        );
 
-        // The only extra account Pacer needs is its own state PDA, derived from the mint.
+        // Extra accounts: Pacer's state PDA (derived from the mint) and the DBC pool (fixed).
         // Nothing depends on the trader's wallet, so generic hook resolvers (including the
         // DBC SDK, which resolves with placeholder keys) produce the right accounts.
-        let metas = [ExtraAccountMeta::new_with_seeds(
-            &[
-                Seed::Literal { bytes: PACE_SEED.to_vec() },
-                Seed::AccountKey { index: 1 }, // mint
-            ],
-            false,
-            true,
-        )?];
+        let metas = [
+            ExtraAccountMeta::new_with_seeds(
+                &[
+                    Seed::Literal {
+                        bytes: PACE_SEED.to_vec(),
+                    },
+                    Seed::AccountKey { index: 1 }, // mint
+                ],
+                false,
+                true,
+            )?,
+            ExtraAccountMeta::new_with_pubkey(&ctx.accounts.pool.key(), false, false)?,
+        ];
         let mut list_data = ctx.accounts.extra_account_meta_list.try_borrow_mut_data()?;
         ExtraAccountMetaList::init::<ExecuteInstruction>(&mut list_data, &metas)?;
 
@@ -103,6 +123,7 @@ pub mod pacer {
         pace.opening_tranche = params.opening_tranche;
         pace.release_per_second = params.release_per_second;
         pace.max_per_buy = params.max_per_buy;
+        pace.initial_base_reserve = initial_base_reserve;
         pace.net_out = 0;
         pace.total_bought = 0;
         pace.total_sold = 0;
@@ -124,25 +145,37 @@ pub mod pacer {
     /// Token-2022 transfer hook entrypoint.
     #[instruction(discriminator = ExecuteInstruction::SPL_DISCRIMINATOR_SLICE)]
     pub fn execute(ctx: Context<Execute>, amount: u64) -> Result<()> {
-        // Only Token-2022 may drive this hook: it sets `transferring` on the source account
-        // for the duration of a real transfer. Direct calls cannot move the clock.
-        assert_is_transferring(&ctx.accounts.source_token.to_account_info())?;
+        // Only a real Token-2022 transfer of *this* mint may drive the hook: Token-2022 sets
+        // `transferring` on the source account for the duration of the transfer, and the
+        // source must hold this mint. A hook of another token cannot replay us mid-transfer.
+        assert_transferring_this_mint(
+            &ctx.accounts.source_token.to_account_info(),
+            &ctx.accounts.mint.key(),
+        )?;
 
         let pace = &mut ctx.accounts.pace_state;
         let source = ctx.accounts.source_token.key();
         let destination = ctx.accounts.destination_token.key();
+        if source != pace.base_vault && destination != pace.base_vault {
+            // Wallet-to-wallet transfers pass untouched.
+            return Ok(());
+        }
+
+        // DBC applies the swap to its reserves before moving tokens, so this is the
+        // post-trade supply outside the curve.
+        let base_reserve = {
+            let pool_data = ctx.accounts.pool.try_borrow_data()?;
+            read_u64(&pool_data, dbc_pool::BASE_RESERVE)
+        };
+        let net_out = pace.initial_base_reserve.saturating_sub(base_reserve);
 
         if source == pace.base_vault {
             // Buy: supply leaves the curve. Enforce the clock.
-            let now = Clock::get()?.unix_timestamp;
-            let released = pace.released_at(now);
             if pace.max_per_buy > 0 {
                 require!(amount <= pace.max_per_buy, PacerError::ExceedsMaxPerBuy);
             }
-            let net_out = pace
-                .net_out
-                .checked_add(amount)
-                .ok_or(PacerError::MathOverflow)?;
+            let now = Clock::get()?.unix_timestamp;
+            let released = pace.released_at(now);
             if net_out > released {
                 msg!(
                     "pacer: buy {} > available {} (released {}, out {})",
@@ -163,18 +196,19 @@ pub mod pacer {
                 released,
                 ts: now,
             });
-        } else if destination == pace.base_vault {
-            // Sell: supply returns to the curve and frees allowance.
-            pace.net_out = pace.net_out.saturating_sub(amount);
-            pace.total_sold = pace.total_sold.saturating_add(amount);
+        } else if net_out < pace.net_out {
+            // Sell through DBC: supply returned to the curve frees allowance. A plain transfer
+            // into the vault leaves DBC's reserves unchanged and is ignored.
+            let returned = pace.net_out - net_out;
+            pace.net_out = net_out;
+            pace.total_sold = pace.total_sold.saturating_add(returned);
             pace.sells = pace.sells.saturating_add(1);
             emit!(PacedSell {
                 mint: pace.mint,
-                amount,
-                net_out: pace.net_out,
+                amount: returned,
+                net_out,
             });
         }
-        // Wallet-to-wallet transfers pass untouched.
         Ok(())
     }
 }
@@ -185,9 +219,16 @@ fn read_pubkey(data: &[u8], offset: usize) -> Pubkey {
     Pubkey::new_from_array(bytes)
 }
 
-fn assert_is_transferring(account: &AccountInfo) -> Result<()> {
+fn read_u64(data: &[u8], offset: usize) -> u64 {
+    let mut bytes = [0u8; 8];
+    bytes.copy_from_slice(&data[offset..offset + 8]);
+    u64::from_le_bytes(bytes)
+}
+
+fn assert_transferring_this_mint(account: &AccountInfo, mint: &Pubkey) -> Result<()> {
     let data = account.try_borrow_data()?;
     let state = StateWithExtensions::<SplTokenAccount>::unpack(&data)?;
+    require_keys_eq!(state.base.mint, *mint, PacerError::NotTransferring);
     let ext = state.get_extension::<TransferHookAccount>()?;
     require!(bool::from(ext.transferring), PacerError::NotTransferring);
     Ok(())
@@ -214,7 +255,9 @@ pub struct PaceState {
     pub opening_tranche: u64,
     pub release_per_second: u64,
     pub max_per_buy: u64,
-    /// Net base units that have left the curve vault (bought minus sold).
+    /// DBC `base_reserve` when the clock started; `net_out` is measured against it.
+    pub initial_base_reserve: u64,
+    /// Net base units that have left the curve (bought minus sold), per DBC's reserves.
     pub net_out: u64,
     pub total_bought: u64,
     pub total_sold: u64,
@@ -258,7 +301,7 @@ pub struct InitializePace<'info> {
     #[account(
         init,
         payer = creator,
-        space = ExtraAccountMetaList::size_of(1).unwrap(),
+        space = ExtraAccountMetaList::size_of(2).unwrap(),
         seeds = [EXTRA_ACCOUNT_METAS_SEED, mint.key().as_ref()],
         bump
     )]
@@ -287,9 +330,12 @@ pub struct Execute<'info> {
         mut,
         seeds = [PACE_SEED, mint.key().as_ref()],
         bump = pace_state.bump,
-        has_one = mint
+        has_one = mint,
+        has_one = pool
     )]
     pub pace_state: Account<'info, PaceState>,
+    /// CHECK: the DBC pool recorded at initialization (`has_one = pool` above).
+    pub pool: UncheckedAccount<'info>,
 }
 
 #[event]
@@ -336,4 +382,66 @@ pub enum PacerError {
     InvalidParams,
     #[msg("Math overflow")]
     MathOverflow,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn state(opening: u64, rate: u64) -> PaceState {
+        PaceState {
+            mint: Pubkey::default(),
+            pool: Pubkey::default(),
+            base_vault: Pubkey::default(),
+            creator: Pubkey::default(),
+            start_ts: 1_000,
+            opening_tranche: opening,
+            release_per_second: rate,
+            max_per_buy: 0,
+            initial_base_reserve: 0,
+            net_out: 0,
+            total_bought: 0,
+            total_sold: 0,
+            buys: 0,
+            sells: 0,
+            bump: 0,
+        }
+    }
+
+    #[test]
+    fn releases_opening_tranche_at_start() {
+        assert_eq!(state(500, 10).released_at(1_000), 500);
+    }
+
+    #[test]
+    fn releases_linearly_after_start() {
+        assert_eq!(state(500, 10).released_at(1_060), 500 + 600);
+    }
+
+    #[test]
+    fn clock_never_runs_backwards() {
+        // A timestamp before start (clock skew) releases only the opening tranche.
+        assert_eq!(state(500, 10).released_at(900), 500);
+    }
+
+    #[test]
+    fn release_saturates_instead_of_overflowing() {
+        assert_eq!(
+            state(u64::MAX - 1, u64::MAX).released_at(i64::MAX),
+            u64::MAX
+        );
+    }
+
+    #[test]
+    fn pool_discriminator_matches_anchor_account_name() {
+        use sha2::{Digest, Sha256};
+        let digest = Sha256::digest(b"account:TransferHookPool");
+        assert_eq!(dbc_pool::DISCRIMINATOR, digest[..8]);
+    }
+
+    #[test]
+    fn pace_state_size_is_stable() {
+        // 4 pubkeys + i64 + 7 u64 + 2 u32 + u8
+        assert_eq!(PaceState::INIT_SPACE, 4 * 32 + 8 + 7 * 8 + 2 * 4 + 1);
+    }
 }

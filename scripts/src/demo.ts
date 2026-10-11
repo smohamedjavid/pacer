@@ -185,15 +185,18 @@ async function main() {
     const available = availableToBuy(pace, now, curveTotal)
 
     if (remaining <= available && remaining > 0n) {
-      // Final buy: take whatever is left; DBC completes the curve.
-      const buyer = participants[turn++ % participants.length]!
+      // Final buy: take whatever is left; DBC completes the curve (partial fill refunds the rest).
+      const balances = await Promise.all(participants.map((p) => connection.getBalance(p.publicKey)))
+      const richest = balances.indexOf(Math.max(...balances))
+      const buyer = participants[richest]!
+      const spendable = balances[richest]! - 0.05 * LAMPORTS_PER_SOL
       const tx = await dbc.pool.swap2WithTransferHook({
         owner: buyer.publicKey,
         pool,
         swapBaseForQuote: false,
         referralTokenAccount: null,
         swapMode: SwapMode.PartialFill,
-        amountIn: new BN(Math.floor(MIGRATION_SOL * LAMPORTS_PER_SOL)),
+        amountIn: new BN(Math.floor(spendable)),
         minimumAmountOut: new BN(0),
       })
       const res = await send(tx, [buyer])
