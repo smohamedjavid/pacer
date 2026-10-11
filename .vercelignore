@@ -1,0 +1,12 @@
+# Never upload secrets or local state to Vercel.
+.keys
+.env
+.env.*
+!app/.env.example
+demo-runs/wallets-*
+# Build output and local tooling not needed by the app build.
+target
+.anchor
+test-ledger
+**/node_modules
+**/.next
