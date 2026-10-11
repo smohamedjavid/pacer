@@ -117,7 +117,8 @@ export type Pacer = {
     {
       "name": "initializePace",
       "docs": [
-        "Attach an issuance clock to a freshly created DBC transfer-hook pool.",
+        "Attach an issuance clock (and optional burst limit) to a freshly created DBC",
+        "transfer-hook pool.",
         "Must be signed by the pool creator; usually sent in the same transaction as",
         "`initialize_virtual_pool_with_token2022_transfer_hook`."
       ],
@@ -286,31 +287,36 @@ export type Pacer = {
     },
     {
       "code": 6002,
+      "name": "burstLimit",
+      "msg": "Buy exceeds the burst limit — too much supply bought in a short window"
+    },
+    {
+      "code": 6003,
       "name": "notTransferring",
       "msg": "Hook can only run inside a Token-2022 transfer"
     },
     {
-      "code": 6003,
+      "code": 6004,
       "name": "invalidPool",
       "msg": "Pool is not a DBC transfer-hook pool for this mint"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "notPoolCreator",
       "msg": "Signer is not the DBC pool creator"
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "mintNotPaced",
       "msg": "Mint's transfer hook is not Pacer"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "invalidParams",
       "msg": "Opening tranche or release rate must be non-zero"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "mathOverflow",
       "msg": "Math overflow"
     }
@@ -344,6 +350,10 @@ export type Pacer = {
           {
             "name": "maxPerBuy",
             "type": "u64"
+          },
+          {
+            "name": "burstCapacity",
+            "type": "u64"
           }
         ]
       }
@@ -371,6 +381,13 @@ export type Pacer = {
             "name": "maxPerBuy",
             "docs": [
               "Largest single buy in base units (0 = no limit)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "burstCapacity",
+            "docs": [
+              "Most that can be bought in a burst, refilled at `release_per_second` (0 = no limit)."
             ],
             "type": "u64"
           }
@@ -413,6 +430,21 @@ export type Pacer = {
           {
             "name": "maxPerBuy",
             "type": "u64"
+          },
+          {
+            "name": "burstCapacity",
+            "docs": [
+              "Token-bucket burst limit: capacity, current level and last refill time."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "burstLevel",
+            "type": "u64"
+          },
+          {
+            "name": "burstUpdatedTs",
+            "type": "i64"
           },
           {
             "name": "initialBaseReserve",

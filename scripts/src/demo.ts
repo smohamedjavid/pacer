@@ -48,15 +48,20 @@ import {
   explorerTx,
   fund,
   send,
+  sendExpectFailure,
   sleep,
+  sweepBack,
   writeRunReport,
 } from './env.js'
 
 const CLOCK_SECONDS = Number(process.env.CLOCK_SECONDS ?? (CLUSTER === 'devnet' ? 240 : 90))
 const MIGRATION_SOL = Number(process.env.MIGRATION_SOL ?? (CLUSTER === 'devnet' ? 1.5 : 5))
-const OPENING_BPS = Number(process.env.OPENING_BPS ?? 500) // 5% at open
-const MAX_PER_BUY_BPS = Number(process.env.MAX_PER_BUY_BPS ?? 1_500) // 15% per buy
+const OPENING_BPS = Number(process.env.OPENING_BPS ?? 200) // 2% at open
+const MAX_PER_BUY_BPS = Number(process.env.MAX_PER_BUY_BPS ?? 600) // 6% per buy
+const BURST_BPS = Number(process.env.BURST_BPS ?? 1_200) // at most 12% in a burst
 const BUYERS = Number(process.env.BUYERS ?? 3)
+// Smallest slice worth a transaction (bps of curve supply); larger on devnet to spare the public RPC.
+const MIN_SLICE_BPS = Number(process.env.MIN_SLICE_BPS ?? (CLUSTER === 'devnet' ? 300 : 25))
 const TOKEN_DECIMALS = 6
 
 interface Step {
@@ -125,7 +130,12 @@ async function main() {
     name: 'Pacer Demo',
     symbol: 'PACE',
     uri: 'https://raw.githubusercontent.com/smohamedjavid/pacer/main/app/public/token.json',
-    schedule: { openingBps: OPENING_BPS, clockSeconds: CLOCK_SECONDS, maxPerBuyBps: MAX_PER_BUY_BPS },
+    schedule: {
+      openingBps: OPENING_BPS,
+      clockSeconds: CLOCK_SECONDS,
+      maxPerBuyBps: MAX_PER_BUY_BPS,
+      burstBps: BURST_BPS,
+    },
   })
   const launchRes = await send(launchTx, [creator, mintKp])
   record({
@@ -142,43 +152,89 @@ async function main() {
   if (!pace) throw new Error('pace state missing')
   log(
     `Clock: ${fmt(pace.openingTranche)} PACE at open, +${fmt(pace.releasePerSecond)}/s, ` +
-      `max ${fmt(pace.maxPerBuy)}/buy, curve supply ${fmt(curveTotal)}, full release at +${clockEndsAt(pace, curveTotal) - pace.startTs}s`
+      `max ${fmt(pace.maxPerBuy)}/buy, burst ${fmt(pace.burstCapacity)}, curve supply ${fmt(curveTotal)}, ` +
+      `full release at +${clockEndsAt(pace, curveTotal) - pace.startTs}s`
   )
 
   // ── 3. Sniper tries to sweep the curve ────────────────────────────────────
   const sweepLamports = new BN(Math.floor(MIGRATION_SOL * 0.5 * LAMPORTS_PER_SOL))
   const sweepTx = await buildQuoteInBuyTx(connection, { owner: sniper.publicKey, pool, quoteAmountIn: sweepLamports })
-  const sweepRes = await send(sweepTx, [sniper])
+  const sweepRes = await sendExpectFailure(sweepTx, [sniper])
   record({
     step: `Sniper sweeps ${MIGRATION_SOL * 0.5} SOL in block one`,
     ok: !sweepRes.ok, // success = the hook rejected it
+    signature: sweepRes.signature,
     detail: { reverted: !sweepRes.ok, reason: pacerErrorFromLogs(sweepRes.logs) ?? sweepRes.error },
   })
   if (sweepRes.ok) throw new Error('expected the sweep to revert')
   log(`  ↳ reverted by Pacer: ${pacerErrorFromLogs(sweepRes.logs)}`)
 
-  // Same sniper, staying under the per-buy cap but ahead of the clock.
-  const aheadAmount = pace.maxPerBuy > 0n ? (pace.maxPerBuy * 9n) / 10n : pace.openingTranche * 2n
+  // Same sniper, staying under the per-buy cap but ahead of the clock (with a few seconds of
+  // margin so the clock can't catch up while the transaction is in flight).
+  const aheadAmount = pace.maxPerBuy > 0n ? (pace.maxPerBuy * 95n) / 100n : pace.openingTranche * 3n
+  const releasedSoon = releasedAt(pace, (await chainTime()) + 4)
+  if (aheadAmount <= releasedSoon) throw new Error('clock too fast for the ahead-of-clock step; raise CLOCK_SECONDS')
   const { transaction: aheadTx } = await buildPacedBuyTx(connection, {
     owner: sniper.publicKey,
     pool,
     baseAmountOut: new BN(aheadAmount.toString()),
   })
-  const aheadRes = await send(aheadTx, [sniper])
+  const aheadRes = await sendExpectFailure(aheadTx, [sniper])
   record({
     step: `Sniper buys ${fmt(aheadAmount)} PACE (under the cap, ahead of the clock)`,
     ok: !aheadRes.ok,
+    signature: aheadRes.signature,
     detail: { reverted: !aheadRes.ok, reason: pacerErrorFromLogs(aheadRes.logs) ?? aheadRes.error },
   })
   if (aheadRes.ok) throw new Error('expected the ahead-of-clock buy to revert')
   log(`  ↳ reverted by Pacer: ${pacerErrorFromLogs(aheadRes.logs)}`)
+
+  // ── 3b. Quiet period, then three bots fire in the same second ───────────────
+  // Without a burst limit, allowance that piles up while nobody buys could be swept at once.
+  const bots = [Keypair.generate(), Keypair.generate(), Keypair.generate()]
+  for (const bot of bots) await fund(bot.publicKey, CLUSTER === 'devnet' ? 0.2 : 2)
+  const burstSlice = pace.maxPerBuy
+  for (;;) {
+    const p = (await fetchPaceState(connection, mint))!
+    if (releasedAt(p, await chainTime()) - p.netOut >= burstSlice * 3n) break
+    await sleep(2_000)
+  }
+  const botTxs = await Promise.all(
+    bots.map((bot) =>
+      // Generous slippage: quotes are taken before any bot fills, so only Pacer should stop them.
+      buildPacedBuyTx(connection, {
+        owner: bot.publicKey,
+        pool,
+        baseAmountOut: new BN(burstSlice.toString()),
+        slippageBps: 5_000,
+      })
+    )
+  )
+  const botResults = await Promise.all(botTxs.map(({ transaction }, i) => sendExpectFailure(transaction, [bots[i]!])))
+  const blocked = botResults.filter((r) => !r.ok)
+  for (const [i, r] of botResults.entries()) {
+    record({
+      step: `Bot ${i + 1} buys ${fmt(burstSlice)} PACE in the same burst`,
+      ok: true,
+      signature: r.signature,
+      detail: { filled: r.ok, reason: r.ok ? undefined : (pacerErrorFromLogs(r.logs) ?? r.error) },
+    })
+  }
+  if (!blocked.some((r) => pacerErrorFromLogs(r.logs)?.includes('burst'))) {
+    throw new Error(
+      `expected the burst limit to block a bot: ${blocked.map((r) => r.logs?.slice(-3).join(' | ')).join(' || ')}`
+    )
+  }
+  log(
+    `  ↳ ${botResults.length - blocked.length} filled, ${blocked.length} blocked by the burst limit: ${pacerErrorFromLogs(blocked[0]!.logs)}`
+  )
 
   // ── 4. Paced buying ───────────────────────────────────────────────────────
   const participants = [sniper, ...buyers]
   let turn = 0
   let soldOnce = false
   let transferredOnce = false
-  const minSlice = curveTotal / 400n
+  const minSlice = (curveTotal * BigInt(MIN_SLICE_BPS)) / 10_000n
 
   for (;;) {
     pace = (await fetchPaceState(connection, mint))!
@@ -343,6 +399,10 @@ async function main() {
     migrated: Boolean(virtualPool?.poolState.isMigrated),
     steps,
     timeline,
+  }
+  if (CLUSTER === 'devnet') {
+    const swept = await sweepBack([creator, sniper, ...buyers, ...bots])
+    log(`Returned ${swept.toFixed(3)} SOL from demo wallets to the deployer`)
   }
   const file = writeRunReport(`latest-${CLUSTER}`, report)
   log(`Report written to ${file}`)

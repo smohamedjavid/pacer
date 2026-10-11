@@ -13,7 +13,7 @@ export const DAMM_V2_CUSTOMIZABLE_MIGRATION_CONFIG = new PublicKey('A8gMrEPJkacW
 
 export const PACE_SEED = Buffer.from('pace')
 /** On-chain size of a `PaceState` account (8-byte discriminator + fields). */
-export const PACE_STATE_SIZE = 8 + 4 * 32 + 8 + 7 * 8 + 2 * 4 + 1
+export const PACE_STATE_SIZE = 8 + 4 * 32 + 2 * 8 + 9 * 8 + 2 * 4 + 1
 export const EXTRA_ACCOUNT_METAS_SEED = Buffer.from('extra-account-metas')
 
 export function derivePaceState(mint: PublicKey): PublicKey {
@@ -45,6 +45,8 @@ export interface PaceParams {
   releasePerSecond: BN
   /** Largest single buy in base units (0 = unlimited). */
   maxPerBuy: BN
+  /** Most that can be bought in a burst, refilled at the release rate (0 = unlimited). */
+  burstCapacity: BN
 }
 
 export interface PaceSchedule {
@@ -56,6 +58,8 @@ export interface PaceSchedule {
   clockSeconds: number
   /** Largest single buy as a share of curve supply, in basis points (0 = unlimited). */
   maxPerBuyBps: number
+  /** Burst limit as a share of curve supply, in basis points (0 = off). */
+  burstBps?: number
 }
 
 /** Turn a human schedule ("5% at open, the rest over 4 hours, max 1% per buy") into on-chain params. */
@@ -65,7 +69,8 @@ export function paceParamsFromSchedule(s: PaceSchedule): PaceParams {
   // Round up so the whole curve is released exactly at the end of the clock.
   const releasePerSecond = rest.addn(s.clockSeconds - 1).divn(s.clockSeconds)
   const maxPerBuy = s.curveSupply.muln(s.maxPerBuyBps).divn(10_000)
-  return { openingTranche, releasePerSecond, maxPerBuy }
+  const burstCapacity = s.curveSupply.muln(s.burstBps ?? 0).divn(10_000)
+  return { openingTranche, releasePerSecond, maxPerBuy, burstCapacity }
 }
 
 export async function buildInitializePaceIx(
@@ -95,6 +100,9 @@ export interface PaceStateView {
   openingTranche: bigint
   releasePerSecond: bigint
   maxPerBuy: bigint
+  burstCapacity: bigint
+  burstLevel: bigint
+  burstUpdatedTs: number
   initialBaseReserve: bigint
   netOut: bigint
   totalBought: bigint
@@ -118,6 +126,9 @@ export async function fetchPaceState(connection: Connection, mint: PublicKey): P
     openingTranche: BigInt(s.openingTranche.toString()),
     releasePerSecond: BigInt(s.releasePerSecond.toString()),
     maxPerBuy: BigInt(s.maxPerBuy.toString()),
+    burstCapacity: BigInt(s.burstCapacity.toString()),
+    burstLevel: BigInt(s.burstLevel.toString()),
+    burstUpdatedTs: s.burstUpdatedTs.toNumber(),
     initialBaseReserve: BigInt(s.initialBaseReserve.toString()),
     netOut: BigInt(s.netOut.toString()),
     totalBought: BigInt(s.totalBought.toString()),
@@ -133,11 +144,21 @@ export function releasedAt(state: PaceStateView, nowSec: number): bigint {
   return state.openingTranche + state.releasePerSecond * elapsed
 }
 
-/** Largest buy (in base units) the hook will accept at `nowSec`. */
+/** Burst bucket level at `nowSec` (mirrors `PaceState::burst_level_at`); `null` when no burst limit. */
+export function burstLevelAt(state: PaceStateView, nowSec: number): bigint | null {
+  if (state.burstCapacity === 0n) return null
+  const elapsed = BigInt(Math.max(0, nowSec - state.burstUpdatedTs))
+  const level = state.burstLevel + state.releasePerSecond * elapsed
+  return level > state.burstCapacity ? state.burstCapacity : level
+}
+
+/** Largest buy (in base units) the hook will accept at `nowSec`: clock, burst limit and max per buy. */
 export function availableToBuy(state: PaceStateView, nowSec: number, curveSupply?: bigint): bigint {
   let released = releasedAt(state, nowSec)
   if (curveSupply !== undefined && released > curveSupply) released = curveSupply
   let available = released > state.netOut ? released - state.netOut : 0n
+  const burst = burstLevelAt(state, nowSec)
+  if (burst !== null && available > burst) available = burst
   if (state.maxPerBuy > 0n && available > state.maxPerBuy) available = state.maxPerBuy
   return available
 }
@@ -159,9 +180,7 @@ export const PACER_ERRORS: Record<number, string> = Object.fromEntries(
 export function pacerErrorFromLogs(logs: string[] | null | undefined): string | null {
   if (!logs) return null
   const clock = logs.find((l) => l.includes('pacer: buy'))
-  const anchorErr = logs.find(
-    (l) => l.includes('Error Code: AheadOfClock') || l.includes('Error Code: ExceedsMaxPerBuy')
-  )
+  const anchorErr = logs.find((l) => /Error Code: (AheadOfClock|ExceedsMaxPerBuy|BurstLimit)/.test(l))
   if (clock || anchorErr) {
     return [anchorErr?.replace(/^Program log: AnchorError.*Error Message: /, ''), clock?.replace('Program log: ', '')]
       .filter(Boolean)
@@ -186,6 +205,9 @@ export async function fetchAllPaceStates(connection: Connection): Promise<PaceSt
       openingTranche: BigInt(s.openingTranche.toString()),
       releasePerSecond: BigInt(s.releasePerSecond.toString()),
       maxPerBuy: BigInt(s.maxPerBuy.toString()),
+      burstCapacity: BigInt(s.burstCapacity.toString()),
+      burstLevel: BigInt(s.burstLevel.toString()),
+      burstUpdatedTs: s.burstUpdatedTs.toNumber(),
       initialBaseReserve: BigInt(s.initialBaseReserve.toString()),
       netOut: BigInt(s.netOut.toString()),
       totalBought: BigInt(s.totalBought.toString()),

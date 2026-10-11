@@ -21,8 +21,14 @@ import {
   fetchPaceState,
   getPacerProgram,
   paceParamsFromSchedule,
+  priceAtNetOut,
+  type PaceSchedule,
 } from '@pacer/sdk'
-import { deriveDbcPoolAddress, deriveDbcTokenVaultAddress } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import {
+  deriveDbcPoolAddress,
+  deriveDbcTokenVaultAddress,
+  getPriceFromSqrtPrice,
+} from '@meteora-ag/dynamic-bonding-curve-sdk'
 import {
   NATIVE_MINT,
   TOKEN_2022_PROGRAM_ID,
@@ -39,7 +45,7 @@ const SLOW = { openingBps: 500, clockSeconds: 1_000_000, maxPerBuyBps: 1_000 }
 
 let config: PublicKey
 
-async function launch(schedule = SLOW) {
+async function launch(schedule: Omit<PaceSchedule, 'curveSupply'> = SLOW) {
   const creator = Keypair.generate()
   await fund(creator.publicKey, 2)
   const mintKp = Keypair.generate()
@@ -233,6 +239,40 @@ describe('pacer', { skip: CLUSTER !== 'localnet' && 'integration tests run on lo
     const res = await send(new Transaction().add(hijack), [attacker])
     assert.equal(res.ok, false)
     assert.equal(anchorError(res.logs), 'NotPoolCreator')
+  })
+
+  test('the burst limit caps back-to-back buys even when the clock has allowance', async () => {
+    // 50% released at open, burst bucket 10%, refilled over ~11 days (no refill mid-test).
+    const { mint, pool } = await launch({
+      openingBps: 5_000,
+      clockSeconds: 1_000_000,
+      maxPerBuyBps: 0,
+      burstBps: 1_000,
+    })
+    const b = await buyer(6)
+    const pace = (await fetchPaceState(connection, mint))!
+    const slice = pace.burstCapacity / 2n
+    assert.ok((await buy(b, pool, slice)).ok, 'first half of the bucket')
+    assert.ok((await buy(b, pool, slice)).ok, 'second half of the bucket')
+    const res = await buy(b, pool, slice)
+    assert.equal(res.ok, false, 'third buy exceeds the bucket although the clock allows it')
+    assert.equal(anchorError(res.logs), 'BurstLimit')
+    const after = (await fetchPaceState(connection, mint))!
+    assert.ok(after.netOut < after.openingTranche, 'clock allowance was not the binding limit')
+  })
+
+  test('the price model matches the live DBC price (price speed limit is exact)', async () => {
+    const { mint, pool } = await launch()
+    const b = await buyer()
+    const pace = (await fetchPaceState(connection, mint))!
+    assert.ok((await buy(b, pool, availableToBuy(pace, await chainTime()))).ok)
+    const after = (await fetchPaceState(connection, mint))!
+    const client = dbcClient(connection)
+    const state = (await client.state.getPool(pool))!
+    const cfg = (await client.state.getPoolConfig(state.poolState.config))!
+    const model = priceAtNetOut(cfg, new BN(after.netOut.toString()))
+    const live = getPriceFromSqrtPrice(state.poolState.sqrtPrice, 6, 9).toNumber()
+    assert.ok(Math.abs(model - live) / live < 1e-9, `model ${model} vs live ${live}`)
   })
 
   test('a running clock cannot be re-initialized', async () => {

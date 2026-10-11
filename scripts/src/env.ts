@@ -73,6 +73,42 @@ export async function send(tx: Transaction, signers: Keypair[]): Promise<SendRes
   }
 }
 
+/**
+ * Send a transaction that is expected to fail, without preflight, so it lands on-chain and
+ * the failure (with the program's error message) is visible in an explorer.
+ */
+export async function sendExpectFailure(tx: Transaction, signers: Keypair[]): Promise<SendResult> {
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed')
+  tx.recentBlockhash = blockhash
+  tx.feePayer = signers[0]!.publicKey
+  tx.sign(...signers)
+  const signature = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: true })
+  await connection
+    .confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed')
+    .catch(() => undefined)
+  const landed = await connection.getTransaction(signature, {
+    commitment: 'confirmed',
+    maxSupportedTransactionVersion: 0,
+  })
+  return { ok: !landed?.meta?.err, signature, logs: landed?.meta?.logMessages ?? undefined }
+}
+
+/** Return leftover SOL from throwaway demo wallets to the deployer (devnet hygiene). */
+export async function sweepBack(wallets: Keypair[]): Promise<number> {
+  let total = 0
+  for (const w of wallets) {
+    const bal = await connection.getBalance(w.publicKey, 'confirmed')
+    const lamports = bal - 5_000
+    if (lamports <= 0) continue
+    const tx = new Transaction().add(
+      SystemProgram.transfer({ fromPubkey: w.publicKey, toPubkey: deployer.publicKey, lamports })
+    )
+    const res = await send(tx, [w])
+    if (res.ok) total += lamports
+  }
+  return total / LAMPORTS_PER_SOL
+}
+
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 export async function chainTime(): Promise<number> {

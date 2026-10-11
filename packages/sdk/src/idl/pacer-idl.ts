@@ -114,7 +114,8 @@ export const PACER_IDL_JSON = {
     {
       "name": "initialize_pace",
       "docs": [
-        "Attach an issuance clock to a freshly created DBC transfer-hook pool.",
+        "Attach an issuance clock (and optional burst limit) to a freshly created DBC",
+        "transfer-hook pool.",
         "Must be signed by the pool creator; usually sent in the same transaction as",
         "`initialize_virtual_pool_with_token2022_transfer_hook`."
       ],
@@ -283,31 +284,36 @@ export const PACER_IDL_JSON = {
     },
     {
       "code": 6002,
+      "name": "BurstLimit",
+      "msg": "Buy exceeds the burst limit — too much supply bought in a short window"
+    },
+    {
+      "code": 6003,
       "name": "NotTransferring",
       "msg": "Hook can only run inside a Token-2022 transfer"
     },
     {
-      "code": 6003,
+      "code": 6004,
       "name": "InvalidPool",
       "msg": "Pool is not a DBC transfer-hook pool for this mint"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "NotPoolCreator",
       "msg": "Signer is not the DBC pool creator"
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "MintNotPaced",
       "msg": "Mint's transfer hook is not Pacer"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "InvalidParams",
       "msg": "Opening tranche or release rate must be non-zero"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "MathOverflow",
       "msg": "Math overflow"
     }
@@ -341,6 +347,10 @@ export const PACER_IDL_JSON = {
           {
             "name": "max_per_buy",
             "type": "u64"
+          },
+          {
+            "name": "burst_capacity",
+            "type": "u64"
           }
         ]
       }
@@ -368,6 +378,13 @@ export const PACER_IDL_JSON = {
             "name": "max_per_buy",
             "docs": [
               "Largest single buy in base units (0 = no limit)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "burst_capacity",
+            "docs": [
+              "Most that can be bought in a burst, refilled at `release_per_second` (0 = no limit)."
             ],
             "type": "u64"
           }
@@ -410,6 +427,21 @@ export const PACER_IDL_JSON = {
           {
             "name": "max_per_buy",
             "type": "u64"
+          },
+          {
+            "name": "burst_capacity",
+            "docs": [
+              "Token-bucket burst limit: capacity, current level and last refill time."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "burst_level",
+            "type": "u64"
+          },
+          {
+            "name": "burst_updated_ts",
+            "type": "i64"
           },
           {
             "name": "initial_base_reserve",

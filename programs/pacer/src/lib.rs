@@ -14,6 +14,10 @@
 //! at launch. Sells return supply to the vault and free allowance; wallet-to-wallet
 //! transfers are never touched.
 //!
+//! An optional burst limit (a token bucket refilled at the same rate as the clock) bounds how
+//! much can be bought in any short window, across all transactions and wallets. Without it,
+//! allowance that goes unused during a quiet period could be swept in a single block.
+//!
 //! `net_out` is never tracked by Pacer itself: it is read from DBC's own pool accounting
 //! (`initial_base_reserve - base_reserve`), which DBC updates before it moves tokens. Tokens
 //! donated straight to the vault, or hook calls outside a real transfer of this mint, can
@@ -58,12 +62,17 @@ mod dbc_pool {
 pub mod pacer {
     use super::*;
 
-    /// Attach an issuance clock to a freshly created DBC transfer-hook pool.
+    /// Attach an issuance clock (and optional burst limit) to a freshly created DBC
+    /// transfer-hook pool.
     /// Must be signed by the pool creator; usually sent in the same transaction as
     /// `initialize_virtual_pool_with_token2022_transfer_hook`.
     pub fn initialize_pace(ctx: Context<InitializePace>, params: PaceParams) -> Result<()> {
         require!(
             params.opening_tranche > 0 || params.release_per_second > 0,
+            PacerError::InvalidParams
+        );
+        require!(
+            params.burst_capacity == 0 || params.release_per_second > 0,
             PacerError::InvalidParams
         );
 
@@ -123,6 +132,9 @@ pub mod pacer {
         pace.opening_tranche = params.opening_tranche;
         pace.release_per_second = params.release_per_second;
         pace.max_per_buy = params.max_per_buy;
+        pace.burst_capacity = params.burst_capacity;
+        pace.burst_level = params.burst_capacity;
+        pace.burst_updated_ts = now;
         pace.initial_base_reserve = initial_base_reserve;
         pace.net_out = 0;
         pace.total_bought = 0;
@@ -138,6 +150,7 @@ pub mod pacer {
             opening_tranche: params.opening_tranche,
             release_per_second: params.release_per_second,
             max_per_buy: params.max_per_buy,
+            burst_capacity: params.burst_capacity,
         });
         Ok(())
     }
@@ -185,6 +198,15 @@ pub mod pacer {
                     pace.net_out
                 );
                 return err!(PacerError::AheadOfClock);
+            }
+            if pace.burst_capacity > 0 {
+                let level = pace.burst_level_at(now);
+                if amount > level {
+                    msg!("pacer: buy {} > burst available {}", amount, level);
+                    return err!(PacerError::BurstLimit);
+                }
+                pace.burst_level = level - amount;
+                pace.burst_updated_ts = now;
             }
             pace.net_out = net_out;
             pace.total_bought = pace.total_bought.saturating_add(amount);
@@ -242,6 +264,8 @@ pub struct PaceParams {
     pub release_per_second: u64,
     /// Largest single buy in base units (0 = no limit).
     pub max_per_buy: u64,
+    /// Most that can be bought in a burst, refilled at `release_per_second` (0 = no limit).
+    pub burst_capacity: u64,
 }
 
 #[account]
@@ -255,6 +279,10 @@ pub struct PaceState {
     pub opening_tranche: u64,
     pub release_per_second: u64,
     pub max_per_buy: u64,
+    /// Token-bucket burst limit: capacity, current level and last refill time.
+    pub burst_capacity: u64,
+    pub burst_level: u64,
+    pub burst_updated_ts: i64,
     /// DBC `base_reserve` when the clock started; `net_out` is measured against it.
     pub initial_base_reserve: u64,
     /// Net base units that have left the curve (bought minus sold), per DBC's reserves.
@@ -272,6 +300,14 @@ impl PaceState {
         let elapsed = now.saturating_sub(self.start_ts).max(0) as u64;
         self.opening_tranche
             .saturating_add(self.release_per_second.saturating_mul(elapsed))
+    }
+
+    /// Burst bucket level at `now`: refilled at the clock rate, capped at capacity.
+    pub fn burst_level_at(&self, now: i64) -> u64 {
+        let elapsed = now.saturating_sub(self.burst_updated_ts).max(0) as u64;
+        self.burst_level
+            .saturating_add(self.release_per_second.saturating_mul(elapsed))
+            .min(self.burst_capacity)
     }
 }
 
@@ -346,6 +382,7 @@ pub struct PaceInitialized {
     pub opening_tranche: u64,
     pub release_per_second: u64,
     pub max_per_buy: u64,
+    pub burst_capacity: u64,
 }
 
 #[event]
@@ -370,6 +407,8 @@ pub enum PacerError {
     AheadOfClock,
     #[msg("Buy exceeds the maximum size per buy")]
     ExceedsMaxPerBuy,
+    #[msg("Buy exceeds the burst limit — too much supply bought in a short window")]
+    BurstLimit,
     #[msg("Hook can only run inside a Token-2022 transfer")]
     NotTransferring,
     #[msg("Pool is not a DBC transfer-hook pool for this mint")]
@@ -398,6 +437,9 @@ mod tests {
             opening_tranche: opening,
             release_per_second: rate,
             max_per_buy: 0,
+            burst_capacity: 0,
+            burst_level: 0,
+            burst_updated_ts: 1_000,
             initial_base_reserve: 0,
             net_out: 0,
             total_bought: 0,
@@ -441,7 +483,19 @@ mod tests {
 
     #[test]
     fn pace_state_size_is_stable() {
-        // 4 pubkeys + i64 + 7 u64 + 2 u32 + u8
-        assert_eq!(PaceState::INIT_SPACE, 4 * 32 + 8 + 7 * 8 + 2 * 4 + 1);
+        // 4 pubkeys + 2 i64 + 9 u64 + 2 u32 + u8
+        assert_eq!(PaceState::INIT_SPACE, 4 * 32 + 2 * 8 + 9 * 8 + 2 * 4 + 1);
+    }
+
+    #[test]
+    fn burst_refills_at_clock_rate_up_to_capacity() {
+        let mut s = state(500, 10);
+        s.burst_capacity = 100;
+        s.burst_level = 0;
+        s.burst_updated_ts = 1_000;
+        assert_eq!(s.burst_level_at(1_000), 0);
+        assert_eq!(s.burst_level_at(1_005), 50);
+        assert_eq!(s.burst_level_at(1_100), 100);
+        assert_eq!(s.burst_level_at(900), 0);
     }
 }

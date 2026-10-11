@@ -8,14 +8,19 @@ import {
   deriveDbcPoolAddress,
   DynamicBondingCurveClient,
   getCurrentPoint,
+  getDeltaAmountBaseUnsigned,
+  getNextSqrtPriceFromBaseAmountOutRoundingUp,
+  getPriceFromSqrtPrice,
   MigratedCollectFeeMode,
   MigrationFeeOption,
   MigrationOption,
+  Rounding,
   SwapMode,
   TokenAuthorityOption,
   TokenDecimal,
   TokenType,
   type ConfigParameters,
+  type PoolConfig,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { NATIVE_MINT } from '@solana/spl-token'
 import { Connection, PublicKey, Transaction } from '@solana/web3.js'
@@ -25,7 +30,9 @@ import {
   DAMM_V2_CUSTOMIZABLE_MIGRATION_CONFIG,
   PACER_PROGRAM_ID,
   paceParamsFromSchedule,
+  releasedAt,
   type PaceSchedule,
+  type PaceStateView,
 } from './core.js'
 
 export { DynamicBondingCurveClient, NATIVE_MINT }
@@ -276,4 +283,38 @@ export async function buildMigrateTx(connection: Connection, args: { payer: Publ
     pool: args.pool,
     dammConfig: DAMM_V2_CUSTOMIZABLE_MIGRATION_CONFIG,
   })
+}
+
+/**
+ * Curve price (quote per base, UI units) after `netOut` base units have been sold from the
+ * curve, walking DBC's constant-product segments from the start price.
+ */
+export function priceAtNetOut(config: PoolConfig, netOut: BN, baseDecimals = 6, quoteDecimals = 9): number {
+  let sqrtPrice = new BN(config.sqrtStartPrice.toString())
+  let remaining = netOut.clone()
+  for (const point of config.curve) {
+    if (remaining.isZero()) break
+    const liquidity = new BN(point.liquidity.toString())
+    const upper = new BN(point.sqrtPrice.toString())
+    if (liquidity.isZero() || upper.lte(sqrtPrice)) continue
+    const segmentBase = getDeltaAmountBaseUnsigned(sqrtPrice, upper, liquidity, Rounding.Down)
+    if (remaining.lte(segmentBase)) {
+      sqrtPrice = getNextSqrtPriceFromBaseAmountOutRoundingUp(sqrtPrice, liquidity, remaining)
+      remaining = new BN(0)
+      break
+    }
+    remaining = remaining.sub(segmentBase)
+    sqrtPrice = upper
+  }
+  return getPriceFromSqrtPrice(sqrtPrice, baseDecimals, quoteDecimals).toNumber()
+}
+
+/**
+ * The price speed limit: the highest curve price reachable at `nowSec`, because supply out of
+ * the curve can't exceed what the clock has released.
+ */
+export function priceCeilingAt(state: PaceStateView, config: PoolConfig, nowSec: number, curveSupply: bigint): number {
+  const released = releasedAt(state, nowSec)
+  const capped = released > curveSupply ? curveSupply : released
+  return priceAtNetOut(config, new BN(capped.toString()))
 }
