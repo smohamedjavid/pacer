@@ -5,15 +5,15 @@ package_manager = "pnpm"
 resolution = true
 skip-lint = false
 
-[programs.devnet]
+[programs.localnet]
 pacer = "4AX6qNnFYqLqKLvcSe6FkvCJWJsoBF9pK743UmEYLokM"
 
-[registry]
-url = "https://api.apr.dev"
+[programs.devnet]
+pacer = "4AX6qNnFYqLqKLvcSe6FkvCJWJsoBF9pK743UmEYLokM"
 
 [provider]
 cluster = "devnet"
 wallet = ".keys/deployer.json"
 
 [scripts]
-test = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 \"tests/**/*.ts\""
+test = "pnpm test"

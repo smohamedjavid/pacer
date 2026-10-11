@@ -1,10 +1,5 @@
 import { AnchorProvider, BN, Program, type Idl } from '@coral-xyz/anchor'
-import {
-  Connection,
-  Keypair,
-  PublicKey,
-  type TransactionInstruction,
-} from '@solana/web3.js'
+import { Connection, Keypair, PublicKey, type TransactionInstruction } from '@solana/web3.js'
 import { PACER_IDL, PACER_IDL_JSON } from './idl/pacer-idl.js'
 import type { Pacer } from './idl/pacer.js'
 
@@ -14,9 +9,7 @@ export const PACER_PROGRAM_ID = new PublicKey(PACER_IDL_JSON.address)
 export const DBC_PROGRAM_ID = new PublicKey('dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN')
 export const DAMM_V2_PROGRAM_ID = new PublicKey('cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG')
 /** DAMM v2 migration config for MigrationFeeOption.Customizable (same on mainnet and devnet). */
-export const DAMM_V2_CUSTOMIZABLE_MIGRATION_CONFIG = new PublicKey(
-  'A8gMrEPJkacWkcb3DGwtJwTe16HktSEfvwtuDh2MCtck'
-)
+export const DAMM_V2_CUSTOMIZABLE_MIGRATION_CONFIG = new PublicKey('A8gMrEPJkacWkcb3DGwtJwTe16HktSEfvwtuDh2MCtck')
 
 export const PACE_SEED = Buffer.from('pace')
 /** On-chain size of a `PaceState` account (8-byte discriminator + fields). */
@@ -28,10 +21,7 @@ export function derivePaceState(mint: PublicKey): PublicKey {
 }
 
 export function deriveExtraAccountMetaList(mint: PublicKey): PublicKey {
-  return PublicKey.findProgramAddressSync(
-    [EXTRA_ACCOUNT_METAS_SEED, mint.toBuffer()],
-    PACER_PROGRAM_ID
-  )[0]
+  return PublicKey.findProgramAddressSync([EXTRA_ACCOUNT_METAS_SEED, mint.toBuffer()], PACER_PROGRAM_ID)[0]
 }
 
 /** Read-only Anchor client. Signing happens on the transaction, not the provider. */
@@ -113,10 +103,7 @@ export interface PaceStateView {
   sells: number
 }
 
-export async function fetchPaceState(
-  connection: Connection,
-  mint: PublicKey
-): Promise<PaceStateView | null> {
+export async function fetchPaceState(connection: Connection, mint: PublicKey): Promise<PaceStateView | null> {
   const program = getPacerProgram(connection)
   const address = derivePaceState(mint)
   const s = await program.account.paceState.fetchNullable(address)
@@ -165,17 +152,16 @@ export function clockEndsAt(state: PaceStateView, curveSupply: bigint): number {
 
 /** Pacer program errors, by Anchor error code, for friendly UI messages. */
 export const PACER_ERRORS: Record<number, string> = Object.fromEntries(
-  PACER_IDL_JSON.errors.map((e: { code: number; msg?: string; name: string }) => [
-    e.code,
-    e.msg ?? e.name,
-  ])
+  PACER_IDL_JSON.errors.map((e: { code: number; msg?: string; name: string }) => [e.code, e.msg ?? e.name])
 )
 
 /** Extract a Pacer error message from simulation/transaction logs, if any. */
 export function pacerErrorFromLogs(logs: string[] | null | undefined): string | null {
   if (!logs) return null
   const clock = logs.find((l) => l.includes('pacer: buy'))
-  const anchorErr = logs.find((l) => l.includes('Error Code: AheadOfClock') || l.includes('Error Code: ExceedsMaxPerBuy'))
+  const anchorErr = logs.find(
+    (l) => l.includes('Error Code: AheadOfClock') || l.includes('Error Code: ExceedsMaxPerBuy')
+  )
   if (clock || anchorErr) {
     return [anchorErr?.replace(/^Program log: AnchorError.*Error Message: /, ''), clock?.replace('Program log: ', '')]
       .filter(Boolean)

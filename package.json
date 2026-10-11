@@ -3,12 +3,24 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "build:program": "anchor build",
+    "build:program": "anchor build && pnpm sync-idl",
+    "sync-idl": "node bin/sync-idl.mjs",
+    "localnet": "./bin/localnet.sh",
     "demo": "pnpm --filter @pacer/scripts demo",
-    "dev": "pnpm --filter @pacer/app dev"
+    "test": "pnpm --filter @pacer/scripts test",
+    "test:program": "cargo test -p pacer",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "dev": "pnpm --filter @pacer/app dev",
+    "build:app": "pnpm --filter @pacer/app build"
   },
   "devDependencies": {
     "typescript": "^5.7.3",
     "prettier": "^3.3.3"
+  },
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=20"
   }
 }

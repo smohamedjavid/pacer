@@ -274,7 +274,7 @@ export const PACER_IDL_JSON = {
     {
       "code": 6000,
       "name": "AheadOfClock",
-      "msg": "Buy is ahead of the issuance clock \u2014 wait for more supply to be released"
+      "msg": "Buy is ahead of the issuance clock — wait for more supply to be released"
     },
     {
       "code": 6001,

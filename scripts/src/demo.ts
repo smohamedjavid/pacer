@@ -113,7 +113,11 @@ async function main() {
 
   // ── 2. Launch + start the issuance clock ──────────────────────────────────
   const mintKp = Keypair.generate()
-  const { transaction: launchTx, pool, curveSupply } = await buildPacedLaunchTx(connection, {
+  const {
+    transaction: launchTx,
+    pool,
+    curveSupply,
+  } = await buildPacedLaunchTx(connection, {
     payer: creator.publicKey,
     creator: creator.publicKey,
     config: configKp.publicKey,
@@ -232,7 +236,11 @@ async function main() {
       const ata = getAssociatedTokenAddressSync(mint, seller.publicKey, false, TOKEN_2022_PROGRAM_ID)
       const bal = BigInt((await connection.getTokenAccountBalance(ata)).value.amount)
       const before = (await fetchPaceState(connection, mint))!.netOut
-      const sellTx = await buildSellTx(connection, { owner: seller.publicKey, pool, baseAmountIn: new BN((bal / 2n).toString()) })
+      const sellTx = await buildSellTx(connection, {
+        owner: seller.publicKey,
+        pool,
+        baseAmountIn: new BN((bal / 2n).toString()),
+      })
       const sellRes = await send(sellTx, [seller])
       const after = (await fetchPaceState(connection, mint))!.netOut
       record({
@@ -265,7 +273,11 @@ async function main() {
         )
       )
       const tRes = await send(tx, [from])
-      record({ step: `Wallet-to-wallet transfer of ${fmt(bal / 4n)} PACE passes the hook`, ok: tRes.ok, signature: tRes.signature })
+      record({
+        step: `Wallet-to-wallet transfer of ${fmt(bal / 4n)} PACE passes the hook`,
+        ok: tRes.ok,
+        signature: tRes.signature,
+      })
     }
   }
 
@@ -273,16 +285,23 @@ async function main() {
   const mintInfo = await getMint(connection, mint, 'confirmed', TOKEN_2022_PROGRAM_ID)
   const hook = getTransferHook(mintInfo)
   const revoked = !hook || hook.programId.equals(PublicKey.default)
-  record({ step: 'DBC revoked the Pacer hook on graduation', ok: revoked, detail: { hookProgram: hook?.programId.toBase58() ?? null } })
+  record({
+    step: 'DBC revoked the Pacer hook on graduation',
+    ok: revoked,
+    detail: { hookProgram: hook?.programId.toBase58() ?? null },
+  })
   pace = (await fetchPaceState(connection, mint))!
 
   // ── 6. Migrate to DAMM v2 ─────────────────────────────────────────────────
-  const { transaction: migrateTx, firstPositionNftKeypair, secondPositionNftKeypair } =
-    await dbc.migration.migrateToDammV2({
-      payer: deployer.publicKey,
-      pool,
-      dammConfig: DAMM_V2_CUSTOMIZABLE_MIGRATION_CONFIG,
-    })
+  const {
+    transaction: migrateTx,
+    firstPositionNftKeypair,
+    secondPositionNftKeypair,
+  } = await dbc.migration.migrateToDammV2({
+    payer: deployer.publicKey,
+    pool,
+    dammConfig: DAMM_V2_CUSTOMIZABLE_MIGRATION_CONFIG,
+  })
   const migrateRes = await send(migrateTx, [deployer, firstPositionNftKeypair, secondPositionNftKeypair])
   const virtualPool = await dbc.state.getPool(pool)
   const dbcConfig = await dbc.state.getPoolConfig(configKp.publicKey)
@@ -291,7 +310,9 @@ async function main() {
     step: 'Graduated into compounding DAMM v2 pool (100% LP permanently locked)',
     ok: migrateRes.ok,
     signature: migrateRes.signature,
-    detail: migrateRes.ok ? { dammPool: dammPool.toBase58() } : { error: migrateRes.error, logs: migrateRes.logs?.slice(-8) },
+    detail: migrateRes.ok
+      ? { dammPool: dammPool.toBase58() }
+      : { error: migrateRes.error, logs: migrateRes.logs?.slice(-8) },
   })
 
   // ── Report ─────────────────────────────────────────────────────────────────

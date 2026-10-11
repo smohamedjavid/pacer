@@ -65,7 +65,11 @@ async function buyer(sol = 3) {
 }
 
 async function buy(owner: Keypair, pool: PublicKey, amount: bigint) {
-  const { transaction } = await buildPacedBuyTx(connection, { owner: owner.publicKey, pool, baseAmountOut: new BN(amount.toString()) })
+  const { transaction } = await buildPacedBuyTx(connection, {
+    owner: owner.publicKey,
+    pool,
+    baseAmountOut: new BN(amount.toString()),
+  })
   return send(transaction, [owner])
 }
 
@@ -131,7 +135,11 @@ describe('pacer', { skip: CLUSTER !== 'localnet' && 'integration tests run on lo
     const pace = (await fetchPaceState(connection, mint))!
     const amount = availableToBuy(pace, await chainTime())
     assert.ok((await buy(b, pool, amount)).ok)
-    const sell = await buildSellTx(connection, { owner: b.publicKey, pool, baseAmountIn: new BN((amount / 2n).toString()) })
+    const sell = await buildSellTx(connection, {
+      owner: b.publicKey,
+      pool,
+      baseAmountIn: new BN((amount / 2n).toString()),
+    })
     assert.ok((await send(sell, [b])).ok)
     const after = (await fetchPaceState(connection, mint))!
     assert.ok(after.netOut < amount, 'net supply out should drop after a sell')
@@ -216,7 +224,12 @@ describe('pacer', { skip: CLUSTER !== 'localnet' && 'integration tests run on lo
     const pool = deriveDbcPoolAddress(NATIVE_MINT, mintKp.publicKey, config)
     const params = paceParamsFromSchedule({ ...SLOW, curveSupply: new BN(1_000_000) })
 
-    const hijack = await buildInitializePaceIx(connection, { creator: attacker.publicKey, mint: mintKp.publicKey, pool, params })
+    const hijack = await buildInitializePaceIx(connection, {
+      creator: attacker.publicKey,
+      mint: mintKp.publicKey,
+      pool,
+      params,
+    })
     const res = await send(new Transaction().add(hijack), [attacker])
     assert.equal(res.ok, false)
     assert.equal(anchorError(res.logs), 'NotPoolCreator')

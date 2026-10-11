@@ -85,6 +85,9 @@ export function writeRunReport(name: string, data: unknown): string {
   const dir = resolve(ROOT, 'demo-runs')
   mkdirSync(dir, { recursive: true })
   const file = resolve(dir, `${name}.json`)
-  writeFileSync(file, JSON.stringify(data, (_k, v) => (typeof v === 'bigint' ? v.toString() : v), 2))
+  writeFileSync(
+    file,
+    JSON.stringify(data, (_k, v) => (typeof v === 'bigint' ? v.toString() : v), 2)
+  )
   return file
 }

@@ -270,10 +270,7 @@ export async function buildSellTx(
  * Permissionless graduation: move a completed curve into its DAMM v2 pool.
  * Signers: payer plus the two returned position-NFT keypairs.
  */
-export async function buildMigrateTx(
-  connection: Connection,
-  args: { payer: PublicKey; pool: PublicKey }
-) {
+export async function buildMigrateTx(connection: Connection, args: { payer: PublicKey; pool: PublicKey }) {
   return dbcClient(connection).migration.migrateToDammV2({
     payer: args.payer,
     pool: args.pool,
