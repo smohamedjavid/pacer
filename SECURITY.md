@@ -44,12 +44,13 @@ Pacer is an upgradeable program. Whoever holds its upgrade authority can replace
 | Change the rules for tokens still on their curve: switch the clock off, or reject all or some transfers (freeze or censor) | Move, mint or burn anyone's tokens or SOL: Token-2022 never passes signer authority to a hook, and Pacer is neither mint authority nor delegate |
 | Close the program, which makes every transfer of every live hooked mint fail                                               | Affect a token after graduation: DBC revokes the hook in the curve-completing swap                                                              |
 
-**Current state (devnet):** the upgrade authority is a single key held by the author, `AKBMcamQCJJ6CTobQzqMUQMG5AzSdyBKfc4GD6wtA7MG`. Verify it with `solana program show 4AX6qNnFYqLqKLvcSe6FkvCJWJsoBF9pK743UmEYLokM -u devnet`.
+**Current state: immutable.** The upgrade authority was revoked on 2026-10-11 (`solana program set-upgrade-authority … --final`), after deploying a verified build. `solana program show 4AX6qNnFYqLqKLvcSe6FkvCJWJsoBF9pK743UmEYLokM -u devnet` prints `Authority: none`, so none of the powers above exist any more.
 
-**Before any mainnet use**, one of these, in order of preference:
+**Verified build.** The on-chain program hash is `4d8ff0fe5d122a7db84ea01e7633af99bfe99637e75662ca8098ea3d68a6e8bd`, the same as a deterministic Docker build of this repository. Reproduce it with:
 
-1. **Immutable.** Revoke the upgrade authority (`solana program set-upgrade-authority <id> --final`) after a verified build, so the published rules can never change.
-2. **Multisig with a timelock.** Transfer the authority to a Squads multisig whose upgrades wait out a public delay longer than the longest clock, so no live launch can have its rules changed mid-schedule.
+```bash
+solana-verify verify-from-repo -u devnet --program-id 4AX6qNnFYqLqKLvcSe6FkvCJWJsoBF9pK743UmEYLokM https://github.com/smohamedjavid/pacer --library-name pacer
+```
 
 ## Known limitations
 

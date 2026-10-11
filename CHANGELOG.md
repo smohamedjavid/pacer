@@ -14,6 +14,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Security
 
+- The devnet program is a verified build (hash `4d8ff0fe5d122a7d…`) and immutable: its upgrade authority is revoked.
+
 - Net supply is read from DBC's pool reserves instead of being counted by the hook; donations to the vault and calls outside a real transfer of the mint can't move the clock.
 - Trades are classified by DBC reserve changes, so base-token fee claims and other non-trade vault transfers are never metered or blocked.
 - Sells refill the burst bucket, so buying and selling straight back can't keep it empty for others.

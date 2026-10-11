@@ -68,7 +68,7 @@ sequenceDiagram
 
 - **A wrapper can be bypassed; a hook can't.** A program that wraps DBC swaps only constrains users who go through it. Anyone can call DBC directly. Token-2022 calls the hook on every transfer of the mint, so the clock holds whatever route a buyer takes.
 - **The trust boundary ends at graduation.** DBC revokes the hook when the curve completes. After that, Pacer has no power over the token at all.
-- **No custody, no admin instruction.** Pacer never holds tokens or SOL, and no instruction lets anyone change a launch's schedule or move funds. The program's upgrade authority is the one privileged key; see [SECURITY.md](../SECURITY.md#upgrade-authority) for exactly what it can and cannot do.
+- **No custody, no admin instruction.** Pacer never holds tokens or SOL, and no instruction lets anyone change a launch's schedule or move funds. The program is immutable (upgrade authority revoked) and its on-chain bytes match a verified build of this repository; see [SECURITY.md](../SECURITY.md#upgrade-authority).
 
 ## How this differs from DBC's rate limiter
 
